@@ -42,17 +42,19 @@ const (
 )
 
 type RemoteConsoleInfo struct {
-	Host        string `json:"host"`
-	Port        int64  `json:"port"`
-	Protocol    string `json:"protocol"`
-	Id          string `json:"id"`
-	OsName      string `json:"osName"`
-	VncPassword string `json:"vncPassword"`
+	Host        string                   `json:"host"`
+	Port        int64                    `json:"port"`
+	Protocol    string                   `json:"protocol"`
+	Id          string                   `json:"id"`
+	OsName      string                   `json:"osName"`
+	VncPassword string                   `json:"vncPassword"`
+	Cred        mcclient.TokenCredential `json:"cred"`
 
 	// used by aliyun server
-	InstanceId    string `json:"instance_id"`
-	InstanceName  string `json:"instance_name"`
-	Url           string `json:"url"`
+	InstanceId   string `json:"instance_id"`
+	InstanceName string `json:"instance_name"`
+	Url          string `json:"url"`
+	//Ips           string `json:"ips"`
 	Password      string `json:"password"`
 	ConnectParams string `json:"connect_params"`
 	ApiServer     string `json:"api_server"`
@@ -69,6 +71,12 @@ func NewRemoteConsoleInfoByCloud(s *mcclient.ClientSession, serverId string) (*R
 		return nil, err
 	}
 
+	server, err := modules.Servers.GetById(s, serverId, nil)
+	if err != nil {
+		return nil, err
+	}
+	vncInfo.InstanceName, _ = server.GetString("name")
+
 	if len(vncInfo.OsName) == 0 || len(vncInfo.VncPassword) == 0 {
 		metadata, err := modules.Servers.GetSpecific(s, serverId, "metadata", nil)
 		if err != nil {
@@ -78,6 +86,7 @@ func NewRemoteConsoleInfoByCloud(s *mcclient.ClientSession, serverId string) (*R
 		vncPasswd, _ := metadata.GetString("__vnc_password")
 		vncInfo.OsName = osName
 		vncInfo.VncPassword = vncPasswd
+		vncInfo.Cred = s.GetToken()
 	}
 
 	return &vncInfo, nil

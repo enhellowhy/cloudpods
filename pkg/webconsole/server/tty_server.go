@@ -83,6 +83,7 @@ func initSocketHandler(so socketio.Socket, p *session.Pty) {
 					cleanUp(so, p)
 				} else {
 					so.Emit(OUTPUT_EVENT, string(data))
+					//fmt.Println(string(data))
 				}
 				continue
 			}

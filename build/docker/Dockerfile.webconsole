@@ -1,3 +1,4 @@
 FROM registry.cn-beijing.aliyuncs.com/yunionio/webconsole-base:v0.2-1
 
+RUN apk add --no-cache s3fs-fuse --repository=http://dl-cdn.alpinelinux.org/alpine/edge/testing
 ADD ./_output/alpine-build/bin/webconsole /opt/yunion/bin/webconsole

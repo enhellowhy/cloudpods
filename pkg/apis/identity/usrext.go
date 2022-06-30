@@ -28,6 +28,7 @@ type SUserExtended struct {
 	IsSystemAccount bool
 
 	Displayname string
+	Avatar      string
 	Email       string
 	Mobile      string
 

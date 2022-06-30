@@ -281,6 +281,7 @@ func (t *SAuthToken) getTokenV3(
 		token.Token.User.PasswordExpiresAt = lastPass.ExpiresAt
 	}
 	token.Token.User.Displayname = user.Displayname
+	token.Token.User.Avatar = user.Avatar
 	token.Token.User.Email = user.Email
 	token.Token.User.Mobile = user.Mobile
 	token.Token.Context = t.Context

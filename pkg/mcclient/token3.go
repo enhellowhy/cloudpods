@@ -95,6 +95,8 @@ type KeystoneUserV3 struct {
 	Email string
 	// 用户手机号
 	Mobile string
+	// 用户头像
+	Avatar string
 }
 
 type KeystoneServiceCatalogV3 []KeystoneServiceV3
@@ -469,6 +471,13 @@ func (self *TokenCredentialV3) GetCatalogData(serviceTypes []string, region stri
 		if len(neps) > 0 {
 			data := map[string]interface{}{
 				"type":      catalog[i].Type,
+				"endpoints": neps,
+			}
+			ret = append(ret, data)
+		}
+		if !utils.IsInStringArray("influxdb", serviceTypes) && catalog[i].Type == "influxdb-cloud" && len(neps) > 0 {
+			data := map[string]interface{}{
+				"type":      "influxdb",
 				"endpoints": neps,
 			}
 			ret = append(ret, data)

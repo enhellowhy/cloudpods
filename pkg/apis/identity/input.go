@@ -475,6 +475,8 @@ type UserUpdateInput struct {
 
 	Mobile string `json:"mobile"`
 
+	Avatar string `json:"avatar"`
+
 	Displayname string `json:"displayname"`
 
 	IsSystemAccount *bool `json:"is_system_account"`
@@ -496,6 +498,8 @@ type UserCreateInput struct {
 	Email string `json:"email"`
 
 	Mobile string `json:"mobile"`
+
+	Avatar string `json:"avatar"`
 
 	Displayname string `json:"displayname"`
 

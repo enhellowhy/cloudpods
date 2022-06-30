@@ -20,10 +20,12 @@ type SIdpAttributeOptions struct {
 
 	UserNameAttribute string `json:"user_name_attribute"`
 	UserIdAttribute   string `json:"user_id_attribute"`
+	StaffIdAttribute  string `json:"staff_id_attribute"`
 
 	UserDisplaynameAttribtue string `json:"user_displayname_attribute"`
 	UserEmailAttribute       string `json:"user_email_attribute"`
 	UserMobileAttribute      string `json:"user_mobile_attribute"`
+	UserAvatarAttribute      string `json:"user_avatar_attribute"`
 
 	ProjectAttribute string `json:"project_attribute"`
 	RolesAttribute   string `json:"roles_attribute"`
@@ -73,6 +75,12 @@ func (a *SIdpAttributeOptions) Update(a2 SIdpAttributeOptions) {
 	}
 	if len(a2.UserMobileAttribute) > 0 {
 		a.UserMobileAttribute = a2.UserMobileAttribute
+	}
+	if len(a2.UserAvatarAttribute) > 0 {
+		a.UserAvatarAttribute = a2.UserAvatarAttribute
+	}
+	if len(a2.StaffIdAttribute) > 0 {
+		a.StaffIdAttribute = a2.StaffIdAttribute
 	}
 	if len(a2.ProjectAttribute) > 0 {
 		a.ProjectAttribute = a2.ProjectAttribute

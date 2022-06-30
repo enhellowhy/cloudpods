@@ -304,6 +304,8 @@ type SUser struct {
 	Email string `json:"email"`
 	// 用户手机号
 	Mobile string `json:"mobile"`
+	// 用户头像
+	Avatar string `json:"avatar"`
 	// 显示名称，用户登录后显示在右上角菜单入口
 	Displayname string `json:"displayname"`
 	// 上次登录时间

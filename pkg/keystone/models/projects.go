@@ -20,9 +20,11 @@ import (
 	"fmt"
 	"strings"
 	"time"
-
 	"yunion.io/x/jsonutils"
 	"yunion.io/x/log"
+	"yunion.io/x/onecloud/pkg/apis/compute"
+	"yunion.io/x/onecloud/pkg/mcclient/auth"
+	"yunion.io/x/onecloud/pkg/mcclient/modules"
 	"yunion.io/x/pkg/errors"
 	"yunion.io/x/pkg/tristate"
 	"yunion.io/x/sqlchemy"
@@ -676,6 +678,69 @@ func (project *SProject) GetUsages() []db.IUsage {
 	return []db.IUsage{
 		&usage,
 	}
+}
+
+type sBucketUsages struct {
+	AllocatedObjects int
+	AllocatedSize    int64
+	BucketNum        int
+}
+
+func (project *SProject) PerformSyncUsages(
+	ctx context.Context,
+	userCred mcclient.TokenCredential,
+	query jsonutils.JSONObject,
+	data jsonutils.JSONObject,
+) (map[string]interface{}, error) {
+	buckets, err := project.GetBucketUsages(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "project.GetBucketUsages")
+	}
+	usages := make(map[string]interface{})
+	var bu sBucketUsages
+
+	for _, bucket := range buckets {
+		bu.AllocatedSize += bucket.SizeBytes
+		bu.AllocatedObjects += bucket.ObjectCnt
+	}
+	bu.BucketNum = len(buckets)
+	usages["storage.bucket.usages"] = []sBucketUsages{bu}
+	return usages, nil
+}
+
+func (project *SProject) GetBucketUsages(ctx context.Context) ([]compute.SBucket, error) {
+	//if using this, token id is empty, but ctx token exists.
+	//s := GetDefaultClientSession(ctx, GetDefaultAdminCred(), options.Options.Region, "")
+	token := ctx.Value(auth.AUTH_TOKEN).(mcclient.TokenCredential)
+	s := GetDefaultClientSession(ctx, token, options.Options.Region, "")
+	//if using this, token manager is empty, nil pointer.
+	//s := auth.GetAdminSession(ctx, options.Options.Region, "")
+
+	data := []jsonutils.JSONObject{}
+	offset := int64(0)
+	params := jsonutils.NewDict()
+	params.Set("scope", jsonutils.NewString("system"))
+	params.Set("limit", jsonutils.NewInt(1024))
+	params.Set("projects", jsonutils.NewString(project.Id))
+	for {
+		params.Set("offset", jsonutils.NewInt(offset))
+		result, err := modules.Buckets.List(s, params)
+		if err != nil {
+			return nil, errors.Wrap(err, "modules.Buckets.List")
+		}
+		data = append(data, result.Data...)
+		if len(data) >= result.Total {
+			break
+		}
+		offset += 1024
+	}
+
+	buckets := []compute.SBucket{}
+	err := jsonutils.Update(&buckets, data)
+	if err != nil {
+		return nil, errors.Wrap(err, "jsonutils.Update")
+	}
+	return buckets, nil
 }
 
 func (manager *SProjectManager) NewProject(ctx context.Context, projectName string, desc string, domainId string) (*SProject, error) {

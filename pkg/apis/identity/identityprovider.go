@@ -138,3 +138,9 @@ type GetIdpSsoCallbackUriOutput struct {
 	// Driver
 	Driver string `json:"driver"`
 }
+
+type GetOauth2IdpInput struct {
+	Admin *bool `json:"admin"`
+	// Driver
+	Driver string `json:"driver"`
+}

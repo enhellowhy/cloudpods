@@ -17,6 +17,7 @@ package models
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"yunion.io/x/jsonutils"
 	"yunion.io/x/pkg/errors"
@@ -97,6 +98,15 @@ func (manager *SServiceManager) InitializeData() error {
 			return nil
 		})
 	}
+	return nil
+}
+
+func (manager *SServiceManager) UpdateExtra(svc *SService, accessToken string, expires int64) error {
+	db.Update(svc, func() error {
+		svc.Extra.Set("Expires", jsonutils.NewString(time.Now().Add(time.Duration(expires) * time.Second).Format("2006-01-02 15:04:05")))
+		svc.Extra.Set("Access_token", jsonutils.NewString(accessToken))
+		return nil
+	})
 	return nil
 }
 

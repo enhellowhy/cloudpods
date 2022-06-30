@@ -62,7 +62,8 @@ type SIdentityBaseResource struct {
 	db.SStandaloneResourceBase
 	db.SDomainizedResourceBase
 
-	Extra *jsonutils.JSONDict `nullable:"true"`
+	//Extra *jsonutils.JSONDict `nullable:"true"`
+	Extra *jsonutils.JSONDict `nullable:"true" list:"admin"`
 	// DomainId string `width:"64" charset:"ascii" default:"default" nullable:"false" index:"true" list:"user"`
 }
 

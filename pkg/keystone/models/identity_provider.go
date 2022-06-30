@@ -1263,71 +1263,123 @@ func (idp *SIdentityProvider) TryUserJoinProject(attrConf api.SIdpAttributeOptio
 		if v, ok := attrs[attrConf.UserMobileAttribute]; ok && len(v) > 0 && len(v[0]) > 0 && usr.Mobile != v[0] {
 			usr.Mobile = v[0]
 		}
+		if v, ok := attrs[attrConf.UserAvatarAttribute]; ok && len(v) > 0 && len(v[0]) > 0 && usr.Avatar != v[0] {
+			usr.Avatar = v[0]
+		}
+		if v, ok := attrs[attrConf.StaffIdAttribute]; ok && len(v) > 0 && len(v[0]) > 0 {
+			if usr.Extra != nil {
+				staffId, _ := usr.Extra.GetString(attrConf.StaffIdAttribute)
+				if staffId != v[0] {
+					usr.Extra.Set(attrConf.StaffIdAttribute, jsonutils.NewString(v[0]))
+				}
+			} else {
+				extra := new(jsonutils.JSONDict)
+				extra.Set(attrConf.StaffIdAttribute, jsonutils.NewString(v[0]))
+				usr.Extra = extra
+			}
+		}
 		return nil
 	})
 	if err != nil {
 		log.Errorf("update user attributes fail %s", err)
 	}
 
-	var targetProject *SProject
+	//var targetProject *SProject
+	targetProjects := make([]*SProject, 0)
 	log.Debugf("userTryJoinProject resp %s proj %s", attrs, attrConf.ProjectAttribute)
 	if !consts.GetNonDefaultDomainProjects() {
 		// if non-default-domain-project is disabled, place new project in default domain
 		domainId = api.DEFAULT_DOMAIN_ID
 	}
 	if len(attrConf.ProjectAttribute) > 0 {
-		projName := fetchAttribute(attrs, attrConf.ProjectAttribute)
-		if len(projName) > 0 {
-			projDomainId := ""
-			if ProjectManager.NamespaceScope() == rbacutils.ScopeDomain {
-				projDomainId = domainId
-			}
-			targetProject, err = ProjectManager.FetchProject("", projName, projDomainId, "")
-			if err != nil {
-				log.Errorf("fetch project %s fail %s", projName, err)
-				if errors.Cause(err) == sql.ErrNoRows && idp.AutoCreateProject.IsTrue() {
-					targetProject, err = ProjectManager.NewProject(ctx, projName, fmt.Sprintf("auto create project for idp %s", idp.Name), domainId)
-					if err != nil {
-						log.Errorf("auto create project %s fail %s", projName, err)
-					}
-				}
-			}
+		//projName := fetchAttribute(attrs, attrConf.ProjectAttribute)
+		projDomainId := ""
+		if ProjectManager.NamespaceScope() == rbacutils.ScopeDomain {
+			projDomainId = domainId
 		}
+		projIds := fetchAttributes(attrs, attrConf.ProjectAttribute)
+		for _, id := range projIds {
+			var targetProject *SProject
+			if id == "system" {
+				targetProject, err = ProjectManager.FetchProjectByName("system", projDomainId, "")
+			} else {
+				targetProject, err = ProjectManager.FetchProjectById(id)
+			}
+			if err != nil {
+				log.Errorf("fetch project %s fail %s", id, err)
+				continue
+			}
+			targetProjects = append(targetProjects, targetProject)
+		}
+		//if len(projName) > 0 {
+		//	projDomainId := ""
+		//	if ProjectManager.NamespaceScope() == rbacutils.ScopeDomain {
+		//		projDomainId = domainId
+		//	}
+		//	targetProject, err = ProjectManager.FetchProject("", projName, projDomainId, "")
+		//	if err != nil {
+		//		log.Errorf("fetch project %s fail %s", projName, err)
+		//		if errors.Cause(err) == sql.ErrNoRows && idp.AutoCreateProject.IsTrue() {
+		//			targetProject, err = ProjectManager.NewProject(ctx, projName, fmt.Sprintf("auto create project for idp %s", idp.Name), domainId)
+		//			if err != nil {
+		//				log.Errorf("auto create project %s fail %s", projName, err)
+		//			}
+		//		}
+		//	}
+		//}
 	}
-	if targetProject == nil && len(attrConf.DefaultProjectId) > 0 {
-		targetProject, err = ProjectManager.FetchProjectById(attrConf.DefaultProjectId)
+	//if targetProject == nil && len(attrConf.DefaultProjectId) > 0 {
+	//	targetProject, err = ProjectManager.FetchProjectById(attrConf.DefaultProjectId)
+	//	if err != nil {
+	//		log.Errorf("fetch default project %s fail %s", attrConf.DefaultProjectId, err)
+	//	}
+	//}
+	if len(targetProjects) == 0 && len(attrConf.DefaultProjectId) > 0 {
+		targetProject, err := ProjectManager.FetchProjectById(attrConf.DefaultProjectId)
 		if err != nil {
 			log.Errorf("fetch default project %s fail %s", attrConf.DefaultProjectId, err)
+			return
 		}
+		targetProjects = append(targetProjects, targetProject)
 	}
-	if targetProject != nil {
-		// put user in project
-		targetRoles := make([]*SRole, 0)
-		if len(attrConf.RolesAttribute) > 0 {
-			roleNames := fetchAttributes(attrs, attrConf.RolesAttribute)
-			for _, roleName := range roleNames {
-				if len(roleName) > 0 {
-					targetRole, err := RoleManager.FetchRole("", roleName, domainId, "")
-					if err != nil {
-						log.Errorf("fetch role %s fail %s", roleName, err)
-					} else {
-						targetRoles = append(targetRoles, targetRole)
+	for _, targetProject := range targetProjects {
+		if targetProject != nil {
+			// put user in project
+			targetRoles := make([]*SRole, 0)
+			if len(attrConf.RolesAttribute) > 0 {
+				roleNames := fetchAttributes(attrs, attrConf.RolesAttribute) //role must be admin
+				for _, roleName := range roleNames {
+					if len(roleName) > 0 {
+						targetRole, err := RoleManager.FetchRole("", roleName, domainId, "")
+						if err != nil {
+							log.Errorf("fetch role %s fail %s", roleName, err)
+						} else {
+							targetRoles = append(targetRoles, targetRole)
+						}
 					}
 				}
 			}
-		}
-		if len(targetRoles) == 0 && len(attrConf.DefaultRoleId) > 0 {
-			targetRole, err := RoleManager.FetchRoleById(attrConf.DefaultRoleId)
-			if err != nil {
-				log.Errorf("fetch default role %s fail %s", attrConf.DefaultRoleId, err)
-			} else {
-				targetRoles = append(targetRoles, targetRole)
+			if len(targetRoles) == 0 && targetProject.Name == "system" {
+				targetRole, err := RoleManager.FetchRoleByName("admin", domainId, "")
+				if err != nil {
+					log.Errorf("fetch admin role fail %s", err)
+				} else {
+					targetRoles = append(targetRoles, targetRole)
+				}
 			}
-		}
-		for _, targetRole := range targetRoles {
-			err = AssignmentManager.ProjectAddUser(ctx, GetDefaultAdminCred(), targetProject, usr, targetRole)
-			if err != nil {
-				log.Errorf("CAS user %s join project %s with role %s fail %s", usr.Name, targetProject.Name, targetRole.Name, err)
+			if len(targetRoles) == 0 && len(attrConf.DefaultRoleId) > 0 {
+				targetRole, err := RoleManager.FetchRoleById(attrConf.DefaultRoleId)
+				if err != nil {
+					log.Errorf("fetch default role %s fail %s", attrConf.DefaultRoleId, err)
+				} else {
+					targetRoles = append(targetRoles, targetRole)
+				}
+			}
+			for _, targetRole := range targetRoles {
+				err = AssignmentManager.ProjectAddUser(ctx, GetDefaultAdminCred(), targetProject, usr, targetRole)
+				if err != nil {
+					log.Errorf("CAS user %s join project %s with role %s fail %s", usr.Name, targetProject.Name, targetRole.Name, err)
+				}
 			}
 		}
 	}

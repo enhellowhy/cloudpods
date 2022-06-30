@@ -15,6 +15,8 @@
 package service
 
 import (
+	"fmt"
+	"github.com/getsentry/sentry-go"
 	"os"
 	"time"
 
@@ -80,6 +82,7 @@ func StartService() {
 
 	app_common.InitBaseAuth(&opts.BaseOptions)
 
+	sentry.CaptureMessage(fmt.Sprintf("%s sentry works!", app.GetName()))
 	common_options.StartOptionManagerWithSessionDriver(opts, opts.ConfigSyncPeriodSeconds, api.SERVICE_TYPE, "", options.OnOptionsChange, models.NewServiceConfigSession())
 
 	if !opts.IsSlaveNode {

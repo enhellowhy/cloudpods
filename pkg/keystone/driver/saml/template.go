@@ -36,6 +36,7 @@ var (
 			UserDisplaynameAttribtue: "http://schemas.microsoft.com/identity/claims/displayname",
 			UserEmailAttribute:       "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress",
 			UserMobileAttribute:      "",
+			UserAvatarAttribute:      "",
 		},
 	}
 )

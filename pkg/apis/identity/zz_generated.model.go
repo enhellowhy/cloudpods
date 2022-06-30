@@ -285,6 +285,7 @@ type SUser struct {
 	SEnabledIdentityBaseResource
 	Email           string    `json:"email"`
 	Mobile          string    `json:"mobile"`
+	Avatar          string    `json:"avatar"`
 	Displayname     string    `json:"displayname"`
 	LastActiveAt    time.Time `json:"last_active_at"`
 	LastLoginIp     string    `json:"last_login_ip"`

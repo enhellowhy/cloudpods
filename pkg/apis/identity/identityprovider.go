@@ -126,3 +126,9 @@ type GetIdpSsoRedirectUriOutput struct {
 type PerformDefaultSsoInput struct {
 	Enable *bool `json:"enable" help:"enable default sso" negative:"disable"`
 }
+
+type GetOauth2IdpInput struct {
+	Admin *bool `json:"admin"`
+	// Driver
+	Driver string `json:"driver"`
+}

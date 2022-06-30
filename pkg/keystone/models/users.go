@@ -80,6 +80,7 @@ type SUser struct {
 
 	Email  string `width:"64" charset:"utf8" nullable:"true" index:"true" list:"domain" update:"domain" create:"domain_optional"`
 	Mobile string `width:"20" charset:"ascii" nullable:"true" index:"true" list:"domain" update:"domain" create:"domain_optional"`
+	Avatar string `with:"128" charset:"utf8" nullable:"true" list:"domain" update:"domain" create:"domain_optional"`
 
 	Displayname string `with:"128" charset:"utf8" nullable:"true" list:"domain" update:"domain" create:"domain_optional"`
 
@@ -122,11 +123,12 @@ func (manager *SUserManager) InitializeData() error {
 		if len(name) == 0 {
 			name = extUser.DomainName
 		}
-		var desc, email, mobile, dispName string
+		var desc, email, mobile, avatar, dispName string
 		if users[i].Extra != nil {
 			desc, _ = users[i].Extra.GetString("description")
 			email, _ = users[i].Extra.GetString("email")
 			mobile, _ = users[i].Extra.GetString("mobile")
+			avatar, _ = users[i].Extra.GetString("avatar")
 			dispName, _ = users[i].Extra.GetString("displayname")
 		}
 		_, err = db.Update(&users[i], func() error {
@@ -136,6 +138,9 @@ func (manager *SUserManager) InitializeData() error {
 			}
 			if len(mobile) > 0 {
 				users[i].Mobile = mobile
+			}
+			if len(avatar) > 0 {
+				users[i].Avatar = avatar
 			}
 			if len(dispName) > 0 {
 				users[i].Displayname = dispName
@@ -245,6 +250,7 @@ func (manager *SUserManager) FetchUserExtended(userId, userName, domainId, domai
 		users.Field("displayname"),
 		users.Field("email"),
 		users.Field("mobile"),
+		users.Field("avatar"),
 		users.Field("enabled"),
 		users.Field("default_project_id"),
 		users.Field("created_at"),

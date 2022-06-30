@@ -15,9 +15,18 @@
 package main
 
 import (
+	"github.com/getsentry/sentry-go"
+	"yunion.io/x/log"
 	"yunion.io/x/onecloud/pkg/keystone/service"
 )
 
 func main() {
+	err := sentry.Init(sentry.ClientOptions{
+		Dsn: "https://f80f1d8968f34768bfd05faa3b51e38c@sentry-new.it.lixiangoa.com/10",
+		AttachStacktrace: true,
+	})
+	if err != nil {
+		log.Fatalf("sentry.Init: %s", err)
+	}
 	service.StartService()
 }

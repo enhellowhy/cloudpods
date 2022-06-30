@@ -16,7 +16,7 @@ package feishu
 
 import (
 	"context"
-	"fmt"
+	//"fmt"
 	"net/http"
 
 	"yunion.io/x/jsonutils"
@@ -44,15 +44,15 @@ const (
 	AuthUrl = "https://open.feishu.cn/open-apis/authen/v1/index"
 )
 
-func (drv *SFeishuOAuth2Driver) GetSsoRedirectUri(ctx context.Context, callbackUrl, state string) (string, error) {
-	req := map[string]string{
-		"app_id":       drv.AppId,
-		"state":        state,
-		"redirect_uri": callbackUrl,
-	}
-	urlStr := fmt.Sprintf("%s?%s", AuthUrl, jsonutils.Marshal(req).QueryString())
-	return urlStr, nil
-}
+//func (drv *SFeishuOAuth2Driver) GetSsoRedirectUri(ctx context.Context, callbackUrl, state string) (string, error) {
+//	req := map[string]string{
+//		"app_id":       drv.AppId,
+//		"state":        state,
+//		"redirect_uri": callbackUrl,
+//	}
+//	urlStr := fmt.Sprintf("%s?%s", AuthUrl, jsonutils.Marshal(req).QueryString())
+//	return urlStr, nil
+//}
 
 const (
 	AppAccessTokenUrl = "https://open.feishu.cn/open-apis/auth/v3/app_access_token/internal/"
@@ -161,24 +161,24 @@ func fetchAppAccessToken(ctx context.Context, appId, appSecret string) (*sAppAcc
 	return &data, nil
 }
 
-func (drv *SFeishuOAuth2Driver) Authenticate(ctx context.Context, code string) (map[string][]string, error) {
-	appData, err := fetchAppAccessToken(ctx, drv.AppId, drv.Secret)
-	if err != nil {
-		return nil, errors.Wrap(err, "fetchAppAccessToken")
-	}
-	accessData, err := fetchAccessToken(ctx, appData.AppAccessToken, code)
-	if err != nil {
-		return nil, errors.Wrap(err, "fetchAccessToken")
-	}
-	userInfo, err := fetchUserInfo(ctx, accessData.AccessToken)
-	if err != nil {
-		return nil, errors.Wrap(err, "fetchUserInfo")
-	}
-	ret := make(map[string][]string)
-	ret["name"] = []string{userInfo.Name}
-	ret["user_id"] = []string{userInfo.UserID}
-	ret["name_en"] = []string{accessData.EnName}
-	ret["email"] = []string{userInfo.Email}
-	ret["mobile"] = []string{userInfo.Mobile}
-	return ret, nil
-}
+//func (drv *SFeishuOAuth2Driver) Authenticate(ctx context.Context, code string) (map[string][]string, error) {
+//	appData, err := fetchAppAccessToken(ctx, drv.AppId, drv.Secret)
+//	if err != nil {
+//		return nil, errors.Wrap(err, "fetchAppAccessToken")
+//	}
+//	accessData, err := fetchAccessToken(ctx, appData.AppAccessToken, code)
+//	if err != nil {
+//		return nil, errors.Wrap(err, "fetchAccessToken")
+//	}
+//	userInfo, err := fetchUserInfo(ctx, accessData.AccessToken)
+//	if err != nil {
+//		return nil, errors.Wrap(err, "fetchUserInfo")
+//	}
+//	ret := make(map[string][]string)
+//	ret["name"] = []string{userInfo.Name}
+//	ret["user_id"] = []string{userInfo.UserID}
+//	ret["name_en"] = []string{accessData.EnName}
+//	ret["email"] = []string{userInfo.Email}
+//	ret["mobile"] = []string{userInfo.Mobile}
+//	return ret, nil
+//}

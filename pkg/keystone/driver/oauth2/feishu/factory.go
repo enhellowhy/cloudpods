@@ -36,6 +36,10 @@ func (drv SFeishuDriverFactory) IdpAttributeOptions() api.SIdpAttributeOptions {
 		UserDisplaynameAttribtue: "name",
 		UserEmailAttribute:       "email",
 		UserMobileAttribute:      "mobile",
+		UserAvatarAttribute:      "avatar",
+		ProjectAttribute:         "project",
+		RolesAttribute:           "roles",
+		StaffIdAttribute:         "staff_id",
 	}
 }
 

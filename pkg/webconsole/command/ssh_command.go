@@ -238,6 +238,7 @@ func (c *SSHtoolSol) Scan(d byte, send func(msg string)) {
 		c.buffer = append(c.buffer, d)
 		if len(c.username) == 0 {
 			send(string(d))
+			//fmt.Println("000000000000", string(d))
 		}
 	}
 	return

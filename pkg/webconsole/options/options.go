@@ -34,6 +34,13 @@ type WebConsoleOptions struct {
 	EnableAutoLogin   bool   `help:"allow webconsole to log in directly with the cloudroot public key" default:"false"`
 	ApsaraConsoleAddr string `help:"Apsara console addr" default:"https://xxxx.com.cn/module/ecs/vnc/index.html"`
 	AliyunVncVersion  string `help:"Aliyun vnc version" default:"0.0.8"`
+
+	S3AccessKey  string `help:"s3 access key"`
+	S3SecretKey  string `help:"s3 secret key"`
+	S3Endpoint   string `help:"s3 endpoint"`
+	S3UseSSL     bool   `help:"s3 access use ssl"`
+	S3BucketName string `help:"s3 bucket name" default:"it-webconsole-prod"`
+	S3MountPoint string `help:"s3fs mount point" default:"/opt/cloud/workspace/data/webconsole/vnc"`
 }
 
 func OnOptionsChange(oldO, newO interface{}) bool {

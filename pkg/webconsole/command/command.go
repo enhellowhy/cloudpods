@@ -25,7 +25,7 @@ import (
 
 const (
 	PROTOCOL_TTY string = "tty"
-	//PROTOCOL_VNC string = "vnc"
+	PROTOCOL_VNC string = "vnc"
 )
 
 type ICommand interface {

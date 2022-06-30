@@ -63,6 +63,12 @@ func NewRemoteConsoleInfoByCloud(s *mcclient.ClientSession, serverId string, que
 	}
 	vncInfo.s = s
 
+	server, err := modules.Servers.GetById(s, serverId, nil)
+	if err != nil {
+		return nil, err
+	}
+	vncInfo.InstanceName, _ = server.GetString("name")
+
 	if len(vncInfo.OsName) == 0 || len(vncInfo.VncPassword) == 0 {
 		metadata, err := modules.Servers.GetSpecific(s, serverId, "metadata", nil)
 		if err != nil {
@@ -72,6 +78,7 @@ func NewRemoteConsoleInfoByCloud(s *mcclient.ClientSession, serverId string, que
 		vncPasswd, _ := metadata.GetString("__vnc_password")
 		vncInfo.OsName = osName
 		vncInfo.VncPassword = vncPasswd
+		vncInfo.Cred = s.GetToken()
 	}
 
 	return &vncInfo, nil

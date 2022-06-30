@@ -85,6 +85,7 @@ func initSocketHandler(so socketio.Socket, p *session.Pty) {
 					// log.Errorf("--p.Pty.output data: %q", data)
 					so.Emit(OUTPUT_EVENT, string(data))
 					go p.Session.GetRecorder().Write("", string(data))
+					//fmt.Println(string(data))
 				}
 				continue
 			}

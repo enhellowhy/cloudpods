@@ -51,7 +51,7 @@ const (
 func InitHandlers(app *appsrv.Application) {
 	app.AddHandler("POST", ApiPathPrefix+"k8s/<podName>/shell", auth.Authenticate(handleK8sShell))
 	app.AddHandler("POST", ApiPathPrefix+"k8s/<podName>/log", auth.Authenticate(handleK8sLog))
-	app.AddHandler("POST", ApiPathPrefix+"baremetal/<id>", auth.Authenticate(handleBaremetalShell))
+	app.AddHandler("POST", ApiPathPrefix+"baremetal/<id>", auth.Authenticate(handleBaremetalVnc))
 	app.AddHandler("POST", ApiPathPrefix+"ssh/<ip>", auth.Authenticate(handleSshShell))
 	app.AddHandler("POST", ApiPathPrefix+"server/<id>", auth.Authenticate(handleServerRemoteConsole))
 
@@ -195,6 +195,30 @@ func handleBaremetalShell(ctx context.Context, w http.ResponseWriter, r *http.Re
 		return
 	}
 	handleCommandSession(ctx, cmd, w)
+}
+
+func handleBaremetalVnc(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+	env, err := fetchCloudEnv(ctx, w, r)
+	if err != nil {
+		httperrors.GeneralServerError(ctx, w, err)
+		return
+	}
+	hostId := env.Params["<id>"]
+	host, err := modules.Hosts.GetById(env.ClientSessin, hostId, nil)
+	if err != nil {
+		httperrors.GeneralServerError(ctx, w, err)
+		return
+	}
+	vncInfo := new(session.RemoteConsoleInfo)
+	vncInfo.Id = hostId
+	vncInfo.Host, _ = host.GetString("ipmi_ip")
+	vncInfo.Port = 17153
+	vncInfo.Protocol = command.PROTOCOL_VNC
+	vncInfo.VncPassword = "L@i%c6No"
+	vncInfo.InstanceName, _ = host.GetString("name")
+	vncInfo.Cred = env.ClientSessin.GetToken()
+
+	handleDataSession(ctx, vncInfo, w, url.Values{"password": {vncInfo.GetPassword()}}, true)
 }
 
 func handleServerRemoteConsole(ctx context.Context, w http.ResponseWriter, r *http.Request) {

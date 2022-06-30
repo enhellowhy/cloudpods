@@ -16,12 +16,16 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
+	"yunion.io/x/onecloud/pkg/util/fileutils2"
+	"yunion.io/x/onecloud/pkg/util/procutils"
 
 	"github.com/gorilla/mux"
 
@@ -63,6 +67,7 @@ func StartService() {
 	}
 
 	for _, binPath := range []string{opts.IpmitoolPath, opts.SshToolPath, opts.SshpassToolPath} {
+		//for _, binPath := range []string{opts.IpmitoolPath, opts.SshToolPath} {
 		ensureBinExists(binPath)
 	}
 
@@ -72,8 +77,57 @@ func StartService() {
 
 	common_options.StartOptionManager(opts, opts.ConfigSyncPeriodSeconds, api.SERVICE_TYPE, api.SERVICE_VERSION, o.OnOptionsChange)
 
+	//s3fs is daemon, otherwise it will be blocked here.
+	initS3()
+
 	registerSigTraps()
 	start()
+}
+
+func initS3() {
+	url := o.Options.S3Endpoint
+	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
+		prefix := "http://"
+		if o.Options.S3UseSSL {
+			prefix = "https://"
+		}
+		url = prefix + url
+	}
+	//err := s3.Init(
+	//	url,
+	//	o.Options.S3AccessKey,
+	//	o.Options.S3SecretKey,
+	//	o.Options.S3BucketName,
+	//	o.Options.S3UseSSL,
+	//)
+	//if err != nil {
+	//	log.Fatalf("failed init s3 client %s", err)
+	//}
+	func() {
+		fd, err := os.OpenFile("/tmp/s3-pass", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+		if err != nil {
+			log.Fatalf("failed open s3 pass file %s", err)
+		}
+		defer fd.Close()
+		_, err = fd.WriteString(fmt.Sprintf("%s:%s", o.Options.S3AccessKey, o.Options.S3SecretKey))
+		if err != nil {
+			log.Fatalf("failed write s3 pass file")
+		}
+	}()
+	if !fileutils2.Exists(o.Options.S3MountPoint) {
+		err := os.MkdirAll(o.Options.S3MountPoint, 0755)
+		if err != nil {
+			log.Fatalf("fail to create %s: %s", o.Options.S3MountPoint, err)
+		}
+	}
+
+	out, err := procutils.NewCommand("s3fs",
+		//o.Options.S3BucketName, o.Options.S3MountPoint, "-f", //this is frontend
+		o.Options.S3BucketName, o.Options.S3MountPoint,
+		"-o", fmt.Sprintf("passwd_file=/tmp/s3-pass,use_path_request_style,url=%s", url)).Output()
+	if err != nil {
+		log.Fatalf("failed mount s3fs %s %s", err, out)
+	}
 }
 
 func registerSigTraps() {

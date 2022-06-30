@@ -17,6 +17,7 @@ package cloudprovider
 import (
 	"encoding/base64"
 	"strings"
+	"yunion.io/x/onecloud/pkg/mcclient"
 
 	"yunion.io/x/jsonutils"
 	"yunion.io/x/pkg/errors"
@@ -330,11 +331,12 @@ type ServerVncOutput struct {
 	Protocol string `json:"protocol"`
 	Port     int64  `json:"port"`
 
-	Url          string `json:"url"`
-	InstanceId   string `json:"instance_id"`
-	InstanceName string `json:"instance_name"`
-	Password     string `json:"password"`
-	VncPassword  string `json:"vnc_password"`
+	Url          string                   `json:"url"`
+	InstanceId   string                   `json:"instance_id"`
+	InstanceName string                   `json:"instance_name"`
+	Password     string                   `json:"password"`
+	VncPassword  string                   `json:"vnc_password"`
+	Cred         mcclient.TokenCredential `json:"cred"`
 
 	OsName string `json:"os_name"`
 

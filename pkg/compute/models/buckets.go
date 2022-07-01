@@ -22,6 +22,10 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"yunion.io/x/onecloud/pkg/mcclient/modules"
+	osprovider "yunion.io/x/onecloud/pkg/multicloud/objectstore/provider"
+	"yunion.io/x/onecloud/pkg/multicloud/objectstore/xsky"
+	"yunion.io/x/pkg/gotypes"
 
 	"github.com/minio/minio-go/pkg/s3utils"
 
@@ -89,6 +93,9 @@ type SBucket struct {
 
 	SizeBytesLimit int64 `nullable:"false" default:"0" list:"user"`
 	ObjectCntLimit int   `nullable:"false" default:"0" list:"user"`
+
+	Versioned bool `nullable:"false" default:"false" list:"user"`
+	Worm      bool `nullable:"false" default:"false" list:"user"`
 
 	AccessUrls jsonutils.JSONObject `nullable:"true" list:"user"`
 }
@@ -302,6 +309,15 @@ func (bucket *SBucket) syncWithCloudBucket(
 			bucket.AccessUrls = jsonutils.Marshal(extBucket.GetAccessUrls())
 
 			bucket.Status = api.BUCKET_STATUS_READY
+			if provider != nil && provider.Provider == api.CLOUD_PROVIDER_XSKY {
+				flag, err := extBucket.(*xsky.SXskyBucket).GetFlag()
+				if err != nil {
+					log.Errorln(err)
+				} else {
+					bucket.Versioned = flag.Versioned
+					bucket.Worm = flag.Worm
+				}
+			}
 		}
 
 		return nil
@@ -378,6 +394,21 @@ func (bucket *SBucket) RemoteDelete(ctx context.Context, userCred mcclient.Token
 	return nil
 }
 
+func (bucket *SBucket) CustomizeCreate(ctx context.Context, userCred mcclient.TokenCredential, ownerId mcclient.IIdentityProvider, query jsonutils.JSONObject, data jsonutils.JSONObject) error {
+	bucket.SSharableVirtualResourceBase.CustomizeCreate(ctx, userCred, ownerId, query, data)
+
+	var input api.BucketCreateInput
+	err := data.Unmarshal(&input)
+	if err != nil {
+		return err
+	}
+	bucket.Worm = input.Worm
+	bucket.Versioned = input.Versioned
+	bucket.SizeBytesLimit = input.SizeBytesLimit
+	bucket.ObjectCntLimit = input.ObjectCntLimit
+	return nil
+}
+
 func (bucket *SBucket) CustomizeDelete(ctx context.Context, userCred mcclient.TokenCredential, query jsonutils.JSONObject, data jsonutils.JSONObject) error {
 	return bucket.StartBucketDeleteTask(ctx, userCred, "")
 }
@@ -422,6 +453,16 @@ func isValidBucketName(name string) error {
 	return s3utils.CheckValidBucketNameStrict(name)
 }
 
+func isValidCloudproviderName(name, accountId string) error {
+	cloudproviders := CloudproviderManager.fetchRecordsByQuery(CloudproviderManager.Query().Equals("cloudaccount_id", accountId))
+	for _, cloudprovider := range cloudproviders {
+		if cloudprovider.Name == name {
+			return fmt.Errorf("user name exists")
+		}
+	}
+	return nil
+}
+
 func (manager *SBucketManager) ValidateCreateData(
 	ctx context.Context,
 	userCred mcclient.TokenCredential,
@@ -436,13 +477,22 @@ func (manager *SBucketManager) ValidateCreateData(
 		return input, errors.Wrap(err, "ValidateCloudregionResourceInput")
 	}
 	var managerV *SCloudprovider
-	managerV, input.CloudproviderResourceInput, err = ValidateCloudproviderResourceInput(userCred, input.CloudproviderResourceInput)
+	if input.CloudproviderType == api.CLOUD_PROVIDER_TYPE_SPECIFY {
+		managerV, input.CloudproviderResourceInput, err = ValidateCloudproviderResourceInput(userCred, input.CloudproviderResourceInput)
+	}
 	if err != nil {
 		return input, errors.Wrap(err, "ValidateCloudproviderResourceInput")
 	}
 
 	if len(input.Name) == 0 {
 		return input, httperrors.NewInputParameterError("missing name")
+	}
+
+	if len(input.CloudproviderName) > 0 && len(input.Cloudaccount) > 0 {
+		err = isValidCloudproviderName(input.CloudproviderName, input.Cloudaccount)
+		if err != nil {
+			return input, httperrors.NewInputParameterError("invalid user name %s: %s", input.CloudproviderName, err)
+		}
 	}
 	err = isValidBucketName(input.Name)
 	if err != nil {
@@ -459,11 +509,17 @@ func (manager *SBucketManager) ValidateCreateData(
 		}
 	}
 
-	quotaKeys := fetchRegionalQuotaKeys(rbacutils.ScopeProject, ownerId, cloudRegionV, managerV)
-	pendingUsage := SRegionQuota{Bucket: 1}
-	pendingUsage.SetKeys(quotaKeys)
-	if err := quotas.CheckSetPendingQuota(ctx, userCred, &pendingUsage); err != nil {
-		return input, httperrors.NewOutOfQuotaError("%s", err)
+	if input.Versioned && input.Worm {
+		return input, httperrors.NewInputParameterError("prohibit both versioned and worm")
+	}
+
+	if managerV != nil {
+		quotaKeys := fetchRegionalQuotaKeys(rbacutils.ScopeProject, ownerId, cloudRegionV, managerV)
+		pendingUsage := SRegionQuota{Bucket: 1}
+		pendingUsage.SetKeys(quotaKeys)
+		if err := quotas.CheckSetPendingQuota(ctx, userCred, &pendingUsage); err != nil {
+			return input, httperrors.NewOutOfQuotaError("%s", err)
+		}
 	}
 
 	input.SharableVirtualResourceCreateInput, err = manager.SSharableVirtualResourceBaseManager.ValidateCreateData(ctx, userCred, ownerId, query, input.SharableVirtualResourceCreateInput)
@@ -486,6 +542,21 @@ func (bucket *SBucket) GetQuotaKeys() (quotas.IQuotaKeys, error) {
 	), nil
 }
 
+func (self *SBucket) setUserId(ctx context.Context, userCred mcclient.TokenCredential, id string) error {
+	//if err := userdata.ValidateUserdata(data); err != nil {
+	//	return err
+	//}
+	//encodeData, err := userdata.Encode(data)
+	//if err != nil {
+	//	return errors.Wrap(err, "encode guest userdata")
+	//}
+	err := self.SetMetadata(ctx, "user_id", id, userCred)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (bucket *SBucket) PostCreate(
 	ctx context.Context,
 	userCred mcclient.TokenCredential,
@@ -505,6 +576,10 @@ func (bucket *SBucket) PostCreate(
 			log.Errorf("CancelPendingUsage error %s", err)
 		}
 	}
+	userId, _ := data.GetString("user_id")
+	if len(userId) > 0 {
+		bucket.setUserId(ctx, userCred, userId)
+	}
 
 	bucket.SetStatus(userCred, api.BUCKET_STATUS_START_CREATE, "PostCreate")
 	task, err := taskman.TaskManager.NewTask(ctx, "BucketCreateTask", bucket, userCred, nil, "", "", nil)
@@ -512,7 +587,7 @@ func (bucket *SBucket) PostCreate(
 		bucket.SetStatus(userCred, api.BUCKET_STATUS_CREATE_FAIL, errors.Wrapf(err, "NewTask").Error())
 		return
 	}
-	task.ScheduleRun(nil)
+	task.ScheduleRun(data)
 }
 
 func (bucket *SBucket) ValidateUpdateData(
@@ -540,13 +615,36 @@ func (bucket *SBucket) RemoteCreate(ctx context.Context, userCred mcclient.Token
 	if err != nil {
 		return errors.Wrap(err, "bucket.GetIRegion")
 	}
-	err = iregion.CreateIBucket(bucket.Name, bucket.StorageClass, bucket.Acl)
-	if err != nil {
-		return errors.Wrap(err, "iregion.CreateIBucket")
-	}
-	extBucket, err := iregion.GetIBucketByName(bucket.Name)
-	if err != nil {
-		return errors.Wrap(err, "iregion.GetIBucketByName")
+	var extBucket cloudprovider.ICloudBucket
+	if iregion.GetProvider() == api.CLOUD_PROVIDER_XSKY {
+		//provider, err := bucket.GetDriver()
+		//if err != nil {
+		//	return errors.Wrap(err, "GetDriver")
+		//}
+		//_, err = provider.(*osprovider.SObjectStoreProvider).CreateBucket(bucket.Name, bucket.StorageClass, bucket.Versioned, bucket.Worm, bucket.SizeBytesLimit, bucket.ObjectCntLimit, bucket.Acl)
+		bucketInfo, err := iregion.(*xsky.SXskyClient).CreateBucket(bucket.Name, bucket.StorageClass, bucket.Versioned, bucket.Worm, bucket.SizeBytesLimit, bucket.ObjectCntLimit, bucket.Acl)
+		if err != nil {
+			return errors.Wrap(err, "xsky.CreateBucket")
+		}
+		//update s3 client for buckets
+		//err = iregion.(*xsky.SXskyClient).FetchBuckets()
+		//if err != nil {
+		//	return errors.Wrap(err, "xsky.FetchBuckets")
+		//}
+		extBucket = iregion.(*xsky.SXskyClient).NewBucket(bucketInfo)
+		if extBucket == nil {
+			return errors.Wrap(err, "xsky.NewBucket extBucket is nil")
+		}
+	} else {
+		//s3 client
+		err = iregion.CreateIBucket(bucket.Name, bucket.StorageClass, bucket.Acl)
+		if err != nil {
+			return errors.Wrap(err, "iregion.CreateIBucket")
+		}
+		extBucket, err = iregion.GetIBucketByName(bucket.Name)
+		if err != nil {
+			return errors.Wrap(err, "iregion.GetIBucketByName")
+		}
 	}
 	err = db.SetExternalId(bucket, userCred, extBucket.GetGlobalId())
 	if err != nil {
@@ -563,6 +661,62 @@ func (bucket *SBucket) RemoteCreate(ctx context.Context, userCred mcclient.Token
 	if err != nil {
 		return errors.Wrap(err, "bucket.syncWithCloudBucket")
 	}
+	return nil
+}
+
+func (bucket *SBucket) RemoteCreateUser(ctx context.Context, userCred mcclient.TokenCredential, account, userName string) (int, error) {
+	cloudaccount := CloudaccountManager.FetchCloudaccountById(account)
+	if cloudaccount == nil {
+		return -1, fmt.Errorf("bucket.FetchCloudaccountById nil")
+	}
+
+	id, err := cloudaccount.CreateObjectStoreUser(userName)
+	if err != nil {
+		return -1, errors.Wrap(err, "cloudaccount.CreateObjectStoreUser")
+	}
+	return id, nil
+}
+
+func (bucket *SBucket) GetSubAccountById(ctx context.Context, userCred mcclient.TokenCredential, account string, id int) (cloudprovider.SSubAccount, error) {
+	cloudaccount := CloudaccountManager.FetchCloudaccountById(account)
+	if cloudaccount == nil {
+		return cloudprovider.SSubAccount{}, fmt.Errorf("bucket.FetchCloudaccountById nil")
+	}
+
+	subAccount, err := cloudaccount.GetSubAccountById(id)
+	if err != nil {
+		return cloudprovider.SSubAccount{}, errors.Wrap(err, "cloudaccount.GetSubAccountById")
+	}
+	return subAccount, nil
+}
+
+func (bucket *SBucket) CreateSubAccountProvider(ctx context.Context, userCred mcclient.TokenCredential, account string, subAccount cloudprovider.SSubAccount) error {
+	cloudaccount := CloudaccountManager.FetchCloudaccountById(account)
+	if cloudaccount == nil {
+		return fmt.Errorf("bucket.FetchCloudaccountById nil")
+	}
+
+	provider, _, err := cloudaccount.importSubAccount(ctx, userCred, subAccount)
+	if err != nil {
+		log.Errorf("importSubAccount fail %s", err)
+		return errors.Wrap(err, "cloudaccount.importSubAccount")
+	}
+	if provider.GetEnabled() {
+		_, err := provider.prepareCloudproviderRegions(ctx, userCred)
+		if err != nil {
+			log.Errorf("syncCloudproviderRegion fail %s", err)
+			return errors.Wrap(err, "provider.prepareCloudproviderRegions")
+		}
+	}
+
+	_, err = db.Update(bucket, func() error {
+		bucket.ManagerId = provider.GetId()
+		return nil
+	})
+	if err != nil {
+		return errors.Wrap(err, "db.SetManagerId")
+	}
+
 	return nil
 }
 
@@ -1194,6 +1348,56 @@ func (bucket *SBucket) PerformSync(
 	}
 
 	return nil, nil
+}
+
+func (bucket *SBucket) PerformSyncUsages(
+	ctx context.Context,
+	userCred mcclient.TokenCredential,
+	query jsonutils.JSONObject,
+	data jsonutils.JSONObject,
+) (map[string]interface{}, error) {
+	if len(bucket.ExternalId) == 0 {
+		return nil, httperrors.NewInvalidStatusError("no external bucket")
+	}
+
+	provider, err := bucket.GetDriver()
+	if err != nil {
+		return nil, errors.Wrap(err, "GetDriver")
+	}
+
+	usages, err := provider.(*osprovider.SObjectStoreProvider).GetObjectStoreBucketUsages(bucket.ExternalId)
+	if err != nil {
+		return nil, errors.Wrap(err, "GetObjectStoreBucketUsages")
+	}
+	//usages := make(map[string]interface{})
+	//usages["xsky.eos.os_buckets.usages.allocated.objects"] = 1
+
+	return usages, nil
+}
+
+func (bucket *SBucket) PerformMonitor(
+	ctx context.Context,
+	userCred mcclient.TokenCredential,
+	query jsonutils.JSONObject,
+	data jsonutils.JSONObject,
+) (map[string]interface{}, error) {
+	if len(bucket.ExternalId) == 0 {
+		return nil, httperrors.NewInvalidStatusError("no external bucket")
+	}
+
+	from, _ := data.GetString("from")
+	interval, _ := data.GetString("interval")
+
+	provider, err := bucket.GetDriver()
+	if err != nil {
+		return nil, errors.Wrap(err, "GetDriver")
+	}
+
+	stats, err := provider.(*osprovider.SObjectStoreProvider).GetObjectStoreBucketSamples(bucket.ExternalId, from, interval)
+	if err != nil {
+		return nil, errors.Wrap(err, "GetObjectStoreBucketSamples")
+	}
+	return stats, nil
 }
 
 func (bucket *SBucket) ValidatePurgeCondition(ctx context.Context) error {
@@ -1967,4 +2171,86 @@ func (manager *SBucketManager) ListItemExportKeys(ctx context.Context,
 		}
 	}
 	return q, nil
+}
+
+func (self *SBucket) NotifyInitiatorFeishuBucketEvent(ctx context.Context, userCred mcclient.TokenCredential) {
+	contentTemplate := "**IT运维通知**\n您在私有云平台申请的存储桶资源开通成功\n桶名称: %s\n对象用户: %s\n访问密钥: %s\n安全密钥: %s\n官方域名: [https://s3.it.lixiangoa.com](https://s3.it.lixiangoa.com)\n私有云控制台地址: [https://cloud.it.lixiangoa.com/](https://cloud.it.lixiangoa.com/)\n___\n如果您使用中遇到任何问题\n可以通过【IT机器人】进行反馈"
+	provider := self.GetCloudprovider()
+	if provider == nil {
+		log.Errorln("NotifyInitiatorFeishuBucketEvent provider is empty.")
+		return
+	}
+	//sk, err := provider.getPassword()
+	//sk, err := utils.DescryptAESBase64(provider.Id, provider.Secret)
+	//if err != nil {
+	//	log.Errorf("NotifyInitiatorFeishuBucketEvent get provider sk error %v.", err)
+	//	return
+	//}
+	iregion, err := self.GetIRegion()
+	if err != nil {
+		log.Errorf("NotifyInitiatorFeishuBucketEvent get bucket.GetIRegion error %v.", err)
+		return
+	}
+	ak, sk, err := iregion.(*xsky.SXskyClient).GetUserKey(self.Name)
+	if err != nil {
+		log.Errorf("NotifyInitiatorFeishuBucketEvent get user key error %v.", err)
+		return
+	}
+	//accountSeg := strings.Split(provider.Account, "/")
+	//if len(accountSeg) != 2 {
+	//	log.Errorf("NotifyInitiatorFeishuBucketEvent get provider ak error, the account is %s.", provider.Account)
+	//	return
+	//}
+	//content := fmt.Sprintf(contentTemplate, self.Name, provider.Name, accountSeg[1], sk)
+	content := fmt.Sprintf(contentTemplate, self.Name, provider.Name, ak, sk)
+	kwargs := jsonutils.NewDict()
+	kwargs.Add(jsonutils.NewString(content), "content")
+	kwargs.Add(jsonutils.NewInt(2), "platform")
+
+	s := auth.GetAdminSession(ctx, options.Options.Region, "")
+	var user jsonutils.JSONObject
+	//get user id
+	meta, _ := self.GetAllMetadata(nil)
+	userId := meta["user_id"]
+	if len(userId) > 0 {
+		user, _ = modules.UsersV3.Get(s, userId, nil)
+	} else {
+		user, _ = modules.UsersV3.Get(s, userCred.GetUserId(), nil)
+	}
+	if user == nil {
+		log.Errorln("NotifyInitiatorFeishuBucketEvent user is empty.")
+		return
+	}
+
+	//feishuUserId
+	var feishuUserId string
+	extra, _ := user.Get(modules.Extra)
+	if gotypes.IsNil(extra) {
+		log.Errorln("NotifyInitiatorFeishuBucketEvent user extra is empty.")
+		return
+	} else {
+		staffId, _ := extra.GetString("staff_id")
+		if staffId == "" {
+			log.Errorln("NotifyInitiatorFeishuBucketEvent user staff_id is empty.")
+			return
+		} else {
+			coaUser, _ := modules.CoaUsers.Get(s, staffId, nil)
+			if gotypes.IsNil(coaUser) {
+				log.Errorln("NotifyInitiatorFeishuBucketEvent coa user is empty.")
+				return
+			} else {
+				feishuUserId, _ = coaUser.GetString("feishu_user_id")
+				if feishuUserId == "" {
+					log.Errorln("NotifyInitiatorFeishuBucketEvent feishuUserId is empty.")
+					return
+				}
+			}
+		}
+	}
+
+	kwargs.Add(jsonutils.NewString(feishuUserId), "feishu_user_id")
+	_, err = modules.CoaUsers.SendMarkdownMessage(s, kwargs)
+	if err != nil {
+		log.Errorf("NotifyInitiatorFeishuBucketEvent send message error %v.", err)
+	}
 }

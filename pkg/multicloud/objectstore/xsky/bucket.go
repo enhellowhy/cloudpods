@@ -16,7 +16,6 @@ package xsky
 
 import (
 	"context"
-	"strconv"
 	"time"
 
 	"yunion.io/x/log"
@@ -32,19 +31,64 @@ type SXskyBucket struct {
 	client *SXskyClient
 }
 
+//func (b *SXskyBucket) GetStats() cloudprovider.SBucketStats {
+//	_, hdr, _ := b.GetIBucketProvider().S3Client().BucketExists(b.Name)
+//	if hdr != nil {
+//		sizeBytesStr := hdr.Get("X-Rgw-Bytes-Used")
+//		sizeBytes, _ := strconv.ParseInt(sizeBytesStr, 10, 64)
+//		objCntStr := hdr.Get("X-Rgw-Object-Count")
+//		objCnt, _ := strconv.ParseInt(objCntStr, 10, 64)
+//		return cloudprovider.SBucketStats{
+//			SizeBytes:   sizeBytes,
+//			ObjectCount: int(objCnt),
+//		}
+//	}
+//	return b.SBucket.GetStats()
+//}
+//
+type SBucketAllStats struct {
+	Name                     string
+	LocalAllocatedObjects    int64
+	ExternalAllocatedSize    int64
+	LocalAllocatedSize       int64
+	ExternalAllocatedObjects int64
+	AllocatedObjects         int64
+	AllocatedSize            int64
+}
+
 func (b *SXskyBucket) GetStats() cloudprovider.SBucketStats {
-	_, hdr, _ := b.GetIBucketProvider().S3Client().BucketExists(b.Name)
-	if hdr != nil {
-		sizeBytesStr := hdr.Get("X-Rgw-Bytes-Used")
-		sizeBytes, _ := strconv.ParseInt(sizeBytesStr, 10, 64)
-		objCntStr := hdr.Get("X-Rgw-Object-Count")
-		objCnt, _ := strconv.ParseInt(objCntStr, 10, 64)
+	bucket, err := b.client.adminApi.getBucketByName(context.Background(), b.Name)
+	if err == nil && bucket != nil {
+		sizeBytes := bucket.Samples[0].AllocatedSize
+		objCnt := bucket.Samples[0].AllocatedObjects
 		return cloudprovider.SBucketStats{
 			SizeBytes:   sizeBytes,
 			ObjectCount: int(objCnt),
 		}
 	}
+	if err != nil {
+		log.Errorf("b.client.adminApi.getBucketByName error %s", err)
+	}
 	return b.SBucket.GetStats()
+}
+
+func (b *SXskyBucket) GetAllStats() SBucketAllStats {
+	bucket, err := b.client.adminApi.getBucketByName(context.Background(), b.Name)
+	if err == nil && bucket != nil {
+		return SBucketAllStats{
+			Name:                     b.Name,
+			AllocatedSize:            bucket.Samples[0].AllocatedSize,
+			AllocatedObjects:         bucket.Samples[0].AllocatedObjects,
+			LocalAllocatedSize:       bucket.Samples[0].LocalAllocatedSize,
+			LocalAllocatedObjects:    bucket.Samples[0].LocalAllocatedObjects,
+			ExternalAllocatedSize:    bucket.Samples[0].ExternalAllocatedSize,
+			ExternalAllocatedObjects: bucket.Samples[0].ExternalAllocatedObjects,
+		}
+	}
+	if err != nil {
+		log.Errorf("b.client.adminApi.getBucketByName error %s", err)
+	}
+	return SBucketAllStats{}
 }
 
 func (b *SXskyBucket) LimitSupport() cloudprovider.SBucketStats {
@@ -86,4 +130,12 @@ func (b *SXskyBucket) SetLimit(limit cloudprovider.SBucketStats) error {
 		return false, nil
 	})
 	return nil
+}
+
+func (b *SXskyBucket) GetFlag() (SFlag, error) {
+	bucket, err := b.client.adminApi.getBucketByName(context.Background(), b.Name)
+	if err != nil {
+		return SFlag{}, errors.Wrap(err, "SXskyBucket.GetFlag.getBucketByName")
+	}
+	return bucket.Flag, nil
 }

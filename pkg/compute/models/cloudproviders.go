@@ -21,6 +21,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	osprovider "yunion.io/x/onecloud/pkg/multicloud/objectstore/provider"
 
 	"yunion.io/x/jsonutils"
 	"yunion.io/x/log"
@@ -900,6 +901,30 @@ func (self *SCloudprovider) GetCloudaccount() (*SCloudaccount, error) {
 	}
 	return obj.(*SCloudaccount), nil
 }
+
+func (self *SCloudprovider) GetObjectStoreStats() (map[string]interface{}, error) {
+	provider, err := self.GetProvider()
+	if err != nil {
+		return nil, err
+	}
+	return provider.(*osprovider.SObjectStoreProvider).GetObjectStoreUserStats()
+}
+
+func (self *SCloudprovider) GetObjectStoreUserSamples(from, interval string) (map[string]interface{}, error) {
+	provider, err := self.GetProvider()
+	if err != nil {
+		return nil, err
+	}
+	return provider.(*osprovider.SObjectStoreProvider).GetObjectStoreUserSamples(from, interval)
+}
+
+//func (self *SCloudprovider) GetObjectStoreBucketSamples(from, interval string) (map[string]interface{}, error) {
+//	provider, err := self.GetProvider()
+//	if err != nil {
+//		return nil, err
+//	}
+//	return provider.(*osprovider.SObjectStoreProvider).GetObjectStoreBucketSamples(from, interval)
+//}
 
 func (manager *SCloudproviderManager) FetchCloudproviderById(providerId string) *SCloudprovider {
 	providerObj, err := manager.FetchById(providerId)

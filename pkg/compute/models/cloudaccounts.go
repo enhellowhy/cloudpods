@@ -23,6 +23,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	osprovider "yunion.io/x/onecloud/pkg/multicloud/objectstore/provider"
 
 	"yunion.io/x/jsonutils"
 	"yunion.io/x/log"
@@ -949,6 +950,38 @@ func (self *SCloudaccount) GetSubAccounts(ctx context.Context) ([]cloudprovider.
 		return nil, err
 	}
 	return provider.GetSubAccounts()
+}
+
+func (self *SCloudaccount) GetObjectStoreStats() (map[string]interface{}, error) {
+	provider, err := self.getProviderInternal()
+	if err != nil {
+		return nil, err
+	}
+	return provider.(*osprovider.SObjectStoreProvider).GetObjectStoreStats()
+}
+
+func (self *SCloudaccount) CreateObjectStoreUser(name string) (int, error) {
+	provider, err := self.getProviderInternal()
+	if err != nil {
+		return -1, err
+	}
+	id, err := provider.(*osprovider.SObjectStoreProvider).CreateUser(name)
+	if err != nil {
+		return -1, err
+	}
+	return id, nil
+}
+
+func (self *SCloudaccount) GetSubAccountById(id int) (cloudprovider.SSubAccount, error) {
+	provider, err := self.getProviderInternal()
+	if err != nil {
+		return cloudprovider.SSubAccount{}, err
+	}
+	subAccount, err := provider.(*osprovider.SObjectStoreProvider).GetSubAccountById(id)
+	if err != nil {
+		return cloudprovider.SSubAccount{}, err
+	}
+	return subAccount, nil
 }
 
 func (self *SCloudaccount) getDefaultExternalProject(id string) (*SExternalProject, error) {

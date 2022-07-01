@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"time"
+	"yunion.io/x/onecloud/pkg/mcclient/modules/notify"
 
 	"yunion.io/x/jsonutils"
 	"yunion.io/x/log"
@@ -172,6 +173,9 @@ func (self *GuestCreateTask) OnDeployGuestDescComplete(ctx context.Context, obj 
 }
 
 func (self *GuestCreateTask) notifyServerCreated(ctx context.Context, guest *models.SGuest) {
+	guest.NotifyInitiatorFeishuServerEvent(ctx, self.UserCred)
+	guest.NotifyRobotServerEvent(ctx, self.UserCred, notifyclient.SERVER_CREATED_LARK, notify.NotifyPriorityNormal, true)
+	guest.StartDevToolScriptApply(ctx)
 	guest.EventNotify(ctx, self.UserCred, notifyclient.ActionCreate)
 }
 

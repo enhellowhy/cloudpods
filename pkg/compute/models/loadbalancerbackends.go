@@ -73,7 +73,7 @@ type SLoadbalancerBackend struct {
 	BackendRole string `width:"36" charset:"ascii" nullable:"false" list:"user" default:"default" create:"optional"`
 	Weight      int    `width:"36" charset:"ascii" nullable:"true" list:"user" create:"optional" update:"user"`
 	Address     string `width:"36" charset:"ascii" nullable:"true" list:"user" create:"optional"`
-	Port        int    `nullable:"false" list:"user" create:"required" update:"user"`
+	Port        int    `nullable:"false" list:"user" create:"optional" update:"user"`
 
 	SendProxy string `width:"16" charset:"ascii" nullable:"false" list:"user" create:"optional" update:"user" default:"off"`
 	Ssl       string `width:"16" charset:"ascii" nullable:"true" list:"user" create:"optional" update:"user" default:"off"`

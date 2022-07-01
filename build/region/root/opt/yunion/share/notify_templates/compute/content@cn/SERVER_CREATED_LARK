@@ -1,0 +1,10 @@
+虚拟机名称: {{ .name }}
+项目: {{ .tenant }}
+申请人: {{ .display_name }}
+申请部门: {{ .department }}
+配置规格: {{ .instance_type }}(通用型 {{ .cpu }}核{{ .mem }}GB)
+磁盘大小: {{ .disk_size }}GB
+分配IP: {{ .ips }}
+创建状态: 已完成
+创建时间: {{ .start_time }}
+完成时间: {{ .end_time }}

@@ -16,6 +16,7 @@ package httperrors
 
 import (
 	"context"
+	"github.com/getsentry/sentry-go"
 	"net/http"
 	"runtime/debug"
 
@@ -88,6 +89,7 @@ func HTTPError(ctx context.Context, w http.ResponseWriter, msg string, statusCod
 	w.Write([]byte(body.String()))
 	log.Errorf("Send error %s", details)
 	if statusCode >= 500 {
+		sentry.CurrentHub().Recover(err)
 		debug.PrintStack()
 	}
 }

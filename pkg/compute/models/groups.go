@@ -854,3 +854,15 @@ func (grp *SGroup) Delete(ctx context.Context, userCred mcclient.TokenCredential
 	}
 	return grp.SVirtualResourceBase.Delete(ctx, userCred)
 }
+
+func (grp *SGroup) PerformChangeOwner(ctx context.Context, userCred mcclient.TokenCredential, query jsonutils.JSONObject, input apis.PerformChangeProjectOwnerInput) (jsonutils.JSONObject, error) {
+	count := grp.GetGuestCount()
+	if count > 0 {
+		return nil, httperrors.NewForbiddenError("the group contains guests")
+	}
+	changOwner, err := grp.SVirtualResourceBase.PerformChangeOwner(ctx, userCred, query, input)
+	if err != nil {
+		return nil, err
+	}
+	return changOwner, nil
+}

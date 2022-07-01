@@ -19,9 +19,10 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
-
 	"yunion.io/x/jsonutils"
 	"yunion.io/x/log"
+	"yunion.io/x/onecloud/pkg/mcclient/auth"
+	"yunion.io/x/onecloud/pkg/mcclient/modules"
 	"yunion.io/x/pkg/tristate"
 	"yunion.io/x/pkg/utils"
 	"yunion.io/x/sqlchemy"
@@ -116,6 +117,7 @@ type SCapabilities struct {
 	MinDataDiskCount   int
 	MaxDataDiskCount   int
 	SchedPolicySupport bool
+	StorageSched       map[string]string `json:",allowempty"`
 	Usable             bool
 
 	// Deprecated
@@ -136,9 +138,10 @@ type SCapabilities struct {
 
 func GetDiskCapabilities(ctx context.Context, userCred mcclient.TokenCredential, query jsonutils.JSONObject, region *SCloudregion, zone *SZone) (SCapabilities, error) {
 	capa := SCapabilities{}
-	s1, d1, s2, s3, d2, d3 := getStorageTypes(region, zone, "")
+	s1, d1, s2, s3, d2, d3, ss := getStorageTypes(ctx, region, zone, "", "")
 	capa.StorageTypes, capa.DataStorageTypes = s1, d1
 	capa.StorageTypes2, capa.StorageTypes3 = s2, s3
+	capa.StorageSched = ss
 	capa.DataStorageTypes2, capa.DataStorageTypes3 = d2, d3
 	capa.MinDataDiskCount = getMinDataDiskCount(region, zone)
 	capa.MaxDataDiskCount = getMaxDataDiskCount(region, zone)
@@ -185,9 +188,10 @@ func GetCapabilities(ctx context.Context, userCred mcclient.TokenCredential, que
 	getBrands(region, zone, domainId, &capa)
 	// capa.Brands, capa.ComputeEngineBrands, capa.NetworkManageBrands, capa.ObjectStorageBrands = a, c, n, o
 	capa.ResourceTypes = getResourceTypes(region, zone, domainId)
-	s1, d1, s2, s3, d2, d3 := getStorageTypes(region, zone, domainId)
+	s1, d1, s2, s3, d2, d3, ss := getStorageTypes(ctx, region, zone, domainId, ownerId.GetProjectId())
 	capa.StorageTypes, capa.DataStorageTypes = s1, d1
 	capa.StorageTypes2, capa.StorageTypes3 = s2, s3
+	capa.StorageSched = ss
 	capa.DataStorageTypes2, capa.DataStorageTypes3 = d2, d3
 	capa.GPUModels = getGPUs(region, zone, domainId)
 	capa.SchedPolicySupport = isSchedPolicySupported(region, zone)
@@ -284,6 +288,66 @@ func domainManagerFieldFilter(domainId, field string) *sqlchemy.SSubQuery {
 	q = q.Filter(sqlchemy.IsTrue(accounts.Field("enabled")))*/
 
 	return q.SubQuery()
+}
+
+func isStorageLocalUsed(ctx context.Context, projectId string) bool {
+	//is not the keystone metadata table.
+	//var ret []db.SMetadata
+	//q := db.Metadata.Query().Equals("obj_type", "project").Equals("key", db.USER_TAG_PREFIX+api.STORAGE_LOCAL).Equals("value", "true")
+	//err := db.FetchModelObjects(db.Metadata, q, &ret)
+	s := auth.GetAdminSession(ctx, options.Options.Region, "")
+	//localParams := new(jsonutils.JSONDict)
+	//localParams.Set(db.USER_TAG_PREFIX+api.STORAGE_LOCAL, jsonutils.Marshal("true"))
+	//meta, err := modules.Projects.GetMetadata(s, projectId, localParams)
+	meta, err := modules.Projects.GetMetadata(s, projectId, nil)
+	if err != nil {
+		log.Errorf("isStorageLocalUsedForProjectsOfCapability: %v", err)
+		return false
+	}
+	isLocalUsed, err := meta.Get(db.USER_TAG_PREFIX + api.STORAGE_LOCAL)
+	if isLocalUsed == nil || err != nil {
+		return false
+	}
+	if ok, _ := isLocalUsed.Bool(); ok {
+		return true
+	}
+	//if err != nil {
+	//	log.Errorf("fetchStorageLocalProjectsOfCapability: %v", err)
+	//}
+
+	return false
+}
+
+func getStorageSchedTag(ctx context.Context) map[string]string {
+	flags := map[string]string{
+		api.STORAGE_RBD_HYBRID:       "",
+		api.STORAGE_RBD_SSD:          "",
+		api.STORAGE_RBD_ENHANCED_SSD: "",
+	}
+	//s := auth.GetAdminSession(ctx, options.Options.Region, "")
+	tags, err := SchedtagManager.GetResourceSchedtags("storages")
+	if err != nil {
+		log.Errorf("getStorageSchedTag: %v", err)
+		return flags
+	}
+	for _, tag := range tags {
+		for storageType, v := range flags {
+			if v != "" {
+				log.Warningf("%s has been in two more schedtags", storageType)
+				continue
+			}
+			//val := tag.GetMetadata(db.USER_TAG_PREFIX+storageType, s.GetToken()) //这个报空指针，是因为tag不是指针接受者么？
+			m := db.SMetadata{}
+			err := db.Metadata.Query().Equals("obj_type", "schedtag").Equals("key", db.USER_TAG_PREFIX+storageType).Equals("obj_id", tag.Id).First(&m)
+			if err == nil {
+				log.Debugf("%s in schedtag %s", storageType, tag.Name)
+				flags[storageType] = tag.Id
+				//return m.Value
+			}
+		}
+	}
+	//log.Infof("%s not found", storageType)
+	return flags
 }
 
 /*func getDomainManagerSubq(domainId string) *sqlchemy.SSubQuery {
@@ -556,11 +620,13 @@ type SimpleStorageInfo struct {
 }
 
 func getStorageTypes(
-	region *SCloudregion, zone *SZone, domainId string,
+	ctx context.Context,
+	region *SCloudregion, zone *SZone, domainId, projectId string,
 ) (
 	[]string, []string,
 	map[string][]string, map[string]map[string]*SimpleStorageInfo,
 	map[string][]string, map[string]map[string]*SimpleStorageInfo,
+	map[string]string,
 ) {
 	storages := StorageManager.Query().SubQuery()
 	disks1 := DiskManager.Query().SubQuery()
@@ -628,7 +694,7 @@ func getStorageTypes(
 	rows, err := q.Rows()
 	if err != nil {
 		log.Errorf("get storage types failed %s", err)
-		return nil, nil, nil, nil, nil, nil
+		return nil, nil, nil, nil, nil, nil, nil
 	}
 	defer rows.Close()
 
@@ -636,6 +702,7 @@ func getStorageTypes(
 		sysStorageTypes           = make([]string, 0)
 		allStorageTypes           = make([]string, 0)
 		storageInfos              = make(map[string]*SimpleStorageInfo)
+		storageSched              = make(map[string]string)
 		sysHypervisorStorageTypes = make(map[string][]string)
 		allHypervisorStorageTypes = make(map[string][]string)
 		sysHypervisorStorageInfos = make(map[string]map[string]*SimpleStorageInfo)
@@ -684,6 +751,12 @@ func getStorageTypes(
 		}
 	)
 
+	isLocalUsed := false
+	if projectId != "" {
+		isLocalUsed = isStorageLocalUsed(ctx, projectId)
+	}
+	isRBDUsed := false
+
 	for rows.Next() {
 		var storage StorageInfo
 		err := rows.Scan(
@@ -696,9 +769,15 @@ func getStorageTypes(
 		)
 		if err != nil {
 			log.Errorf("Scan storage rows %s", err)
-			return nil, nil, nil, nil, nil, nil
+			return nil, nil, nil, nil, nil, nil, nil
 		}
 		storageHypervisor := api.HOSTTYPE_HYPERVISOR[storage.HostType]
+		if storageHypervisor == api.HYPERVISOR_KVM && storage.StorageType == api.STORAGE_LOCAL && !isLocalUsed {
+			continue
+		}
+		if storageHypervisor == api.HYPERVISOR_KVM && storage.StorageType == api.STORAGE_RBD && !isRBDUsed {
+			isRBDUsed = true
+		}
 		if len(storage.StorageType) > 0 && len(storage.MediumType) > 0 {
 			storageType := fmt.Sprintf("%s/%s", storage.StorageType, storage.MediumType)
 			simpleStorage, ok := storageInfos[storageType]
@@ -728,9 +807,26 @@ func getStorageTypes(
 			}
 		}
 	}
+	if isRBDUsed {
+		flags := getStorageSchedTag(ctx)
+		for k, v := range flags {
+			if v != "" {
+				storageType := k + "/" + api.DISK_TYPE_SSD
+				if k == api.STORAGE_RBD_HYBRID {
+					storageType = k + "/" + api.DISK_TYPE_HYBRID
+				}
+				sysStorageTypes = append(sysStorageTypes, storageType)
+				allStorageTypes = append(allStorageTypes, storageType)
+				setStorageTypes(api.HYPERVISOR_KVM, storageType, sysHypervisorStorageTypes)
+				setStorageTypes(api.HYPERVISOR_KVM, storageType, allHypervisorStorageTypes)
+				storageSched[k] = v
+			}
+		}
+	}
 	return sysStorageTypes, allStorageTypes,
 		sysHypervisorStorageTypes, sysHypervisorStorageInfos,
-		allHypervisorStorageTypes, allHypervisorStorageInfos
+		allHypervisorStorageTypes, allHypervisorStorageInfos,
+		storageSched
 }
 
 func getGPUs(region *SCloudregion, zone *SZone, domainId string) []string {

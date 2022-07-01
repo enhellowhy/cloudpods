@@ -16,8 +16,11 @@ package tasks
 
 import (
 	"context"
+	"yunion.io/x/onecloud/pkg/mcclient/auth"
+	"yunion.io/x/onecloud/pkg/mcclient/modules/compute"
 
 	"yunion.io/x/jsonutils"
+	"yunion.io/x/log"
 
 	api "yunion.io/x/onecloud/pkg/apis/compute"
 	"yunion.io/x/onecloud/pkg/cloudcommon/db"
@@ -65,6 +68,20 @@ func (self *LoadbalancerCreateTask) OnLoadbalancerCreateComplete(ctx context.Con
 	lb.SetStatus(self.GetUserCred(), api.LB_STATUS_ENABLED, "")
 	db.OpsLog.LogEvent(lb, db.ACT_ALLOCATE, lb.GetShortDesc(ctx), self.UserCred)
 	logclient.AddActionLogWithStartable(self, lb, logclient.ACT_CREATE, nil, self.UserCred, true)
+
+	//create default backend group
+	params := jsonutils.NewDict()
+	name := lb.Name + "(" + lb.Address + ")-local-" + api.LB_BACKENDGROUP_TYPE_DEFAULT
+	params.Add(jsonutils.NewString(name), "name")
+	params.Add(jsonutils.NewString(lb.Id), "loadbalancer")
+	params.Add(jsonutils.NewString("default"), "type")
+
+	s := auth.GetAdminSession(ctx, "")
+	_, err := compute.LoadbalancerBackendGroups.Create(s, params)
+	if err != nil {
+		log.Errorf("LoadbalancerBackendGroups.Create error %s", err)
+	}
+
 	self.SetStage("OnLoadbalancerStartComplete", nil)
 	lb.StartLoadBalancerStartTask(ctx, self.GetUserCred(), self.GetTaskId())
 }
@@ -79,6 +96,7 @@ func (self *LoadbalancerCreateTask) OnLoadbalancerStartComplete(ctx context.Cont
 		Obj:    lb,
 		Action: notifyclient.ActionCreate,
 	})
+	lb.NotifyInitiatorFeishuLoadbalancerEvent(ctx, self.UserCred)
 	self.SetStageComplete(ctx, nil)
 }
 

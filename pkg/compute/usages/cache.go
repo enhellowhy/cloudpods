@@ -41,6 +41,8 @@ func getCacheKey(
 	cloudEnv string,
 	includeSystem bool,
 	projectTags tagutils.TTagSetList,
+	from string,
+	interval string,
 ) string {
 	type RangeObject struct {
 		Resource string `json:"resource"`
@@ -57,6 +59,8 @@ func getCacheKey(
 		Brands      []string             `json:"brands"`
 		CloudEnv    string               `json:"cloud_env"`
 		System      bool                 `json:"system"`
+		From      string               `json:"from"`
+		Interval  string               `json:"interval"`
 		ProjectTags tagutils.TTagSetList `json:"project_tags"`
 	}
 	key := KeyStruct{}
@@ -82,6 +86,8 @@ func getCacheKey(
 	key.Providers = providers
 	key.Brands = brands
 	key.CloudEnv = cloudEnv
+	key.From = from
+	key.Interval = interval
 	key.System = includeSystem
 	key.ProjectTags = projectTags
 	jsonObj := jsonutils.Marshal(key)

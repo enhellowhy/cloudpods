@@ -17,15 +17,14 @@ package models
 import (
 	"context"
 	"fmt"
-
-	"yunion.io/x/jsonutils"
-	"yunion.io/x/pkg/errors"
 	"yunion.io/x/pkg/utils"
 
+	"yunion.io/x/jsonutils"
 	api "yunion.io/x/onecloud/pkg/apis/compute"
 	"yunion.io/x/onecloud/pkg/cloudcommon/db"
 	"yunion.io/x/onecloud/pkg/mcclient"
 	"yunion.io/x/onecloud/pkg/util/influxdb"
+	"yunion.io/x/pkg/errors"
 )
 
 func (lblis *SLoadbalancerListener) GetDetailsBackendStatus(ctx context.Context, userCred mcclient.TokenCredential, query jsonutils.JSONObject) (jsonutils.JSONObject, error) {
@@ -36,14 +35,15 @@ func (lblis *SLoadbalancerListener) GetDetailsBackendStatus(ctx context.Context,
 	if lblis.BackendGroupId == "" {
 		return jsonutils.NewArray(), nil
 	}
-	var pxname string
-	switch lblis.ListenerType {
-	case api.LB_LISTENER_TYPE_TCP:
-		pxname = fmt.Sprintf("backends_listener-%s", lblis.Id)
-	case api.LB_LISTENER_TYPE_HTTP, api.LB_LISTENER_TYPE_HTTPS:
-		pxname = fmt.Sprintf("backends_listener_default-%s", lblis.Id)
-	}
-	return lbGetBackendGroupCheckStatus(ctx, userCred, lblis.LoadbalancerId, pxname, lblis.BackendGroupId)
+	//var pxname string
+	//switch lblis.ListenerType {
+	//case api.LB_LISTENER_TYPE_TCP:
+	//	pxname = fmt.Sprintf("backends_listener-%s", lblis.Id)
+	//case api.LB_LISTENER_TYPE_HTTP, api.LB_LISTENER_TYPE_HTTPS:
+	//	pxname = fmt.Sprintf("backends_listener_default-%s", lblis.Id)
+	//}
+	//return lbGetBackendGroupCheckStatus(ctx, userCred, lblis.LoadbalancerId, pxname, lblis.BackendGroupId)
+	return lbGetBackendGroupCheckStatus(ctx, userCred, lblis.LoadbalancerId, lblis.Id, lblis.BackendGroupId)
 }
 
 func (lbr *SLoadbalancerListenerRule) GetDetailsBackendStatus(ctx context.Context, userCred mcclient.TokenCredential, query jsonutils.JSONObject) (jsonutils.JSONObject, error) {
@@ -98,7 +98,7 @@ func lbGetInfluxdbByLbId(lbId string) (*influxdb.SInfluxdb, string, error) {
 	return dbinst, dbName, nil
 }
 
-func lbGetBackendGroupCheckStatus(ctx context.Context, userCred mcclient.TokenCredential, lbId string, pxname string, groupId string) (*jsonutils.JSONArray, error) {
+func lbGetBackendGroupCheckStatus(ctx context.Context, userCred mcclient.TokenCredential, lbId string, lbLis string, groupId string) (*jsonutils.JSONArray, error) {
 	var (
 		backendJsons []jsonutils.JSONObject
 		backendIds   []string
@@ -130,8 +130,10 @@ func lbGetBackendGroupCheckStatus(ctx context.Context, userCred mcclient.TokenCr
 		return nil, errors.Wrapf(err, "find influxdb for loadbalancer %s", lbId)
 	}
 
-	queryFmt := "select check_status, check_code from %s..haproxy where pxname = '%s' and svname =~ /........-....-....-....-............/ group by pxname, svname order by time desc limit 1"
-	querySql := fmt.Sprintf(queryFmt, dbName, pxname)
+	//queryFmt := "select check_status, check_code from %s..haproxy where pxname = '%s' and svname =~ /........-....-....-....-............/ group by pxname, svname order by time desc limit 1"
+	queryFmt := "select mean(value) AS \"check_code\" from %s..loadbalancer_backends_state where listener_uuid = '%s' and time > now()-5s and realserver_uuid =~ /........-....-....-....-............/ group by listener_uuid, realserver_uuid"
+	querySql := fmt.Sprintf(queryFmt, dbName, lbLis)
+	//querySql := fmt.Sprintf(queryFmt, dbName, "dc0c55c1-5dd6-4c48-855c-c075abe6d34f")
 	queryRes, err := dbinst.Query(querySql)
 	if err != nil {
 		return nil, errors.Wrap(err, "query influxdb")
@@ -140,22 +142,24 @@ func lbGetBackendGroupCheckStatus(ctx context.Context, userCred mcclient.TokenCr
 		return nil, fmt.Errorf("query influxdb: expecting 1 set of results, got %d", len(queryRes))
 	}
 	type Tags struct {
-		PxName string `json:"pxname"`
-		SvName string `json:"svname"`
+		//PxName string `json:"pxname"`
+		//SvName string `json:"svname"`
+		ListenerUuid   string `json:"listener_uuid"`
+		RealserverUuid string `json:"realserver_uuid"`
 	}
 	for _, resSeries := range queryRes[0] {
 		if len(resSeries.Values) == 0 {
 			continue
 		}
 		resColumns := resSeries.Values[0]
-		if len(resColumns) != 3 {
+		if len(resColumns) != 2 {
 			continue
 		}
 		tags := Tags{}
 		if err := resSeries.Tags.Unmarshal(&tags); err != nil {
 			return nil, errors.Wrap(err, "unmarshal tags in influxdb query result")
 		}
-		ok, i := utils.InStringArray(tags.SvName, backendIds)
+		ok, i := utils.InStringArray(tags.RealserverUuid, backendIds)
 		if !ok {
 			continue
 		}
@@ -167,6 +171,15 @@ func lbGetBackendGroupCheckStatus(ctx context.Context, userCred mcclient.TokenCr
 			}
 			if colName == "time" {
 				colName = "check_time"
+			} else {
+				val, _ := colVal.Float()
+				if val == 0 {
+					backendJson.Set("check_status", jsonutils.NewString("正常"))
+				} else if val == 1 {
+					backendJson.Set("check_status", jsonutils.NewString("异常"))
+				} else {
+					backendJson.Set("check_status", jsonutils.NewString("部分异常"))
+				}
 			}
 			backendJson.Set(colName, colVal)
 		}

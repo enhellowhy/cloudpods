@@ -15,6 +15,7 @@
 package atexit
 
 import (
+	"github.com/getsentry/sentry-go"
 	"os"
 	"runtime/debug"
 	"sort"
@@ -95,6 +96,7 @@ func Handle() {
 						if val != nil {
 							print("panic ", val, "\n")
 							debug.PrintStack()
+							sentry.CurrentHub().Recover(val)
 						}
 					}()
 					eh.Func(eh)

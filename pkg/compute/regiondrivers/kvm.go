@@ -178,14 +178,19 @@ func (self *SKVMRegionDriver) ValidateCreateLoadbalancerBackendData(ctx context.
 	backendTypeV := validators.NewStringChoicesValidator("backend_type", api.LB_BACKEND_TYPES)
 	keyV := map[string]validators.IValidator{
 		"backend_type": backendTypeV,
-		"weight":       validators.NewRangeValidator("weight", 1, 256).Default(1),
-		"port":         validators.NewPortValidator("port"),
-		"send_proxy":   validators.NewStringChoicesValidator("send_proxy", api.LB_SENDPROXY_CHOICES).Default(api.LB_SENDPROXY_OFF),
-		"ssl":          validators.NewStringChoicesValidator("ssl", api.LB_BOOL_VALUES).Default(api.LB_BOOL_OFF),
+		//"weight":       validators.NewRangeValidator("weight", 1, 256).Default(1),
+		"weight": validators.NewRangeValidator("weight", 0, 100).Default(1),
+		//"port":       validators.NewPortValidator("port"),
+		"send_proxy": validators.NewStringChoicesValidator("send_proxy", api.LB_SENDPROXY_CHOICES).Default(api.LB_SENDPROXY_OFF),
+		"ssl":        validators.NewStringChoicesValidator("ssl", api.LB_BOOL_VALUES).Default(api.LB_BOOL_OFF),
 	}
 
 	if err := RunValidators(keyV, data, false); err != nil {
 		return nil, err
+	}
+	addedBackends, err := backendGroup.GetBackends()
+	if err != nil {
+		return nil, httperrors.NewInternalServerError("get exist backends err %v", err)
 	}
 
 	var basename string
@@ -200,6 +205,11 @@ func (self *SKVMRegionDriver) ValidateCreateLoadbalancerBackendData(ctx context.
 		err = man.ValidateBackendVpc(lb, guest, backendGroup)
 		if err != nil {
 			return nil, err
+		}
+		for _, addedBackend := range addedBackends {
+			if addedBackend.BackendType == api.LB_BACKEND_GUEST && addedBackend.BackendId == guest.Id {
+				return nil, httperrors.NewInputParameterError("guest %s has been added", guest.Name)
+			}
 		}
 		basename = guest.Name
 		backend = backendV.Model
@@ -216,6 +226,11 @@ func (self *SKVMRegionDriver) ValidateCreateLoadbalancerBackendData(ctx context.
 			}
 			data.Set("address", jsonutils.NewString(host.AccessIp))
 		}
+		for _, addedBackend := range addedBackends {
+			if addedBackend.BackendType == api.LB_BACKEND_HOST && addedBackend.BackendId == host.Id {
+				return nil, httperrors.NewInputParameterError("host %s has been added", host.Name)
+			}
+		}
 		basename = host.Name
 		backend = backendV.Model
 	case api.LB_BACKEND_IP:
@@ -226,6 +241,11 @@ func (self *SKVMRegionDriver) ValidateCreateLoadbalancerBackendData(ctx context.
 		}
 		ip := backendV.IP.String()
 		data.Set("address", jsonutils.NewString(ip))
+		for _, addedBackend := range addedBackends {
+			if addedBackend.BackendType == api.LB_BACKEND_IP && addedBackend.Address == ip {
+				return nil, httperrors.NewInputParameterError("IP %s has been added", ip)
+			}
+		}
 		basename = ip
 	default:
 		return nil, httperrors.NewInputParameterError("internal error: unexpected backend type %s", backendType)
@@ -233,7 +253,8 @@ func (self *SKVMRegionDriver) ValidateCreateLoadbalancerBackendData(ctx context.
 
 	name, _ := data.GetString("name")
 	if name == "" {
-		name = fmt.Sprintf("%s-%s-%s-%s", backendGroup.Name, backendType, basename, rand.String(4))
+		//name = fmt.Sprintf("%s-%s-%s-%s", backendGroup.Name, backendType, basename, rand.String(4))
+		name = fmt.Sprintf("%s-%s-%s", backendType, basename, rand.String(4))
 	}
 
 	switch backendType {
@@ -277,7 +298,8 @@ func (self *SKVMRegionDriver) ValidateCreateLoadbalancerBackendData(ctx context.
 
 func (self *SKVMRegionDriver) ValidateUpdateLoadbalancerBackendData(ctx context.Context, userCred mcclient.TokenCredential, data *jsonutils.JSONDict, lbbg *models.SLoadbalancerBackendGroup) (*jsonutils.JSONDict, error) {
 	keyV := map[string]validators.IValidator{
-		"weight":     validators.NewRangeValidator("weight", 1, 256),
+		//"weight":     validators.NewRangeValidator("weight", 1, 256),
+		"weight":     validators.NewRangeValidator("weight", 0, 100),
 		"port":       validators.NewPortValidator("port"),
 		"send_proxy": validators.NewStringChoicesValidator("send_proxy", api.LB_SENDPROXY_CHOICES),
 		"ssl":        validators.NewStringChoicesValidator("ssl", api.LB_BOOL_VALUES),
@@ -450,8 +472,9 @@ func (self *SKVMRegionDriver) ValidateUpdateLoadbalancerListenerRuleData(ctx con
 
 func (self *SKVMRegionDriver) ValidateCreateLoadbalancerListenerData(ctx context.Context, userCred mcclient.TokenCredential, ownerId mcclient.IIdentityProvider, data *jsonutils.JSONDict, lb *models.SLoadbalancer, backendGroup db.IModel) (*jsonutils.JSONDict, error) {
 	var (
-		listenerTypeV = validators.NewStringChoicesValidator("listener_type", api.LB_LISTENER_TYPES)
-		listenerPortV = validators.NewPortValidator("listener_port")
+		listenerTypeV      = validators.NewStringChoicesValidator("listener_type", api.LB_LISTENER_TYPES)
+		listenerPortV      = validators.NewPortValidator("listener_port")
+		backendServerPortV = validators.NewPortValidator("backend_server_port")
 
 		aclStatusV = validators.NewStringChoicesValidator("acl_status", api.LB_BOOL_VALUES)
 		aclTypeV   = validators.NewStringChoicesValidator("acl_type", api.LB_ACL_TYPES)
@@ -482,6 +505,7 @@ func (self *SKVMRegionDriver) ValidateCreateLoadbalancerListenerData(ctx context
 		"client_idle_timeout":     validators.NewRangeValidator("client_idle_timeout", 0, 600).Default(90),
 		"backend_connect_timeout": validators.NewRangeValidator("backend_connect_timeout", 0, 180).Default(5),
 		"backend_idle_timeout":    validators.NewRangeValidator("backend_idle_timeout", 0, 600).Default(90),
+		"backend_server_port":     backendServerPortV,
 
 		"sticky_session":                validators.NewStringChoicesValidator("sticky_session", api.LB_BOOL_VALUES).Default(api.LB_BOOL_OFF),
 		"sticky_session_type":           validators.NewStringChoicesValidator("sticky_session_type", api.LB_STICKY_SESSION_TYPES).Default(api.LB_STICKY_SESSION_TYPE_INSERT),
@@ -590,11 +614,12 @@ func (self *SKVMRegionDriver) ValidateUpdateLoadbalancerListenerData(ctx context
 	}
 
 	var (
-		redirectV       = validators.NewStringChoicesValidator("redirect", api.LB_REDIRECT_TYPES)
-		redirectCodeV   = validators.NewIntChoicesValidator("redirect_code", api.LB_REDIRECT_CODES)
-		redirectSchemeV = validators.NewStringChoicesValidator("redirect_scheme", api.LB_REDIRECT_SCHEMES)
-		redirectHostV   = validators.NewHostPortValidator("redirect_host").OptionalPort(true)
-		redirectPathV   = validators.NewURLPathValidator("redirect_path")
+		redirectV          = validators.NewStringChoicesValidator("redirect", api.LB_REDIRECT_TYPES)
+		redirectCodeV      = validators.NewIntChoicesValidator("redirect_code", api.LB_REDIRECT_CODES)
+		redirectSchemeV    = validators.NewStringChoicesValidator("redirect_scheme", api.LB_REDIRECT_SCHEMES)
+		redirectHostV      = validators.NewHostPortValidator("redirect_host").OptionalPort(true)
+		redirectPathV      = validators.NewURLPathValidator("redirect_path")
+		backendServerPortV = validators.NewPortValidator("backend_server_port")
 	)
 	if lblis.Redirect != "" {
 		redirectV.Default(lblis.Redirect)
@@ -630,6 +655,8 @@ func (self *SKVMRegionDriver) ValidateUpdateLoadbalancerListenerData(ctx context
 		"client_idle_timeout":     validators.NewRangeValidator("client_idle_timeout", 0, 600),
 		"backend_connect_timeout": validators.NewRangeValidator("backend_connect_timeout", 0, 180),
 		"backend_idle_timeout":    validators.NewRangeValidator("backend_idle_timeout", 0, 600),
+		//"backend_server_port":     validators.NewRangeValidator("backend_server_port", 1, 65535),
+		"backend_server_port": backendServerPortV,
 
 		"sticky_session":                validators.NewStringChoicesValidator("sticky_session", api.LB_BOOL_VALUES),
 		"sticky_session_type":           validators.NewStringChoicesValidator("sticky_session_type", api.LB_STICKY_SESSION_TYPES),

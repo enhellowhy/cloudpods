@@ -136,7 +136,7 @@ type SLoadbalancerListener struct {
 	ListenerType      string `width:"16" charset:"ascii" nullable:"false" list:"user" create:"required"`
 	ListenerPort      int    `nullable:"false" list:"user" create:"required"`
 	BackendGroupId    string `width:"36" charset:"ascii" nullable:"true" list:"user" create:"optional" update:"user"`
-	BackendServerPort int    `nullable:"false" get:"user" list:"user" default:"0" create:"optional"`
+	BackendServerPort int    `nullable:"false" get:"user" list:"user" default:"0" create:"optional" update:"user"`
 
 	Scheduler string `width:"16" charset:"ascii" nullable:"false" list:"user" create:"optional" update:"user"`
 
@@ -499,7 +499,7 @@ func (lblis *SLoadbalancerListener) StartLoadBalancerListenerSyncTask(ctx contex
 	return nil
 }
 
-func (lblis *SLoadbalancerListener) getMoreDetails(out api.LoadbalancerListenerDetails) (api.LoadbalancerListenerDetails, error) {
+func (lblis *SLoadbalancerListener) getMoreDetails(out api.LoadbalancerListenerDetails, ctx context.Context, userCred mcclient.TokenCredential) (api.LoadbalancerListenerDetails, error) {
 	{
 		if lblis.BackendGroupId != "" {
 			lbbg, err := LoadbalancerBackendGroupManager.FetchById(lblis.BackendGroupId)
@@ -519,6 +519,35 @@ func (lblis *SLoadbalancerListener) getMoreDetails(out api.LoadbalancerListenerD
 		}
 	}
 
+	{
+		out.BackendErrList = make([]string, 0)
+		backends, err := lblis.GetDetailsBackendStatus(ctx, userCred, nil)
+		if err != nil {
+			log.Errorf("loadbalancer listener %s(%s): fetch backend group (%s) status error: %s",
+				lblis.Name, lblis.Id, lblis.BackendGroupId, err)
+			out.CheckStatus = "failed"
+			return out, err
+		}
+		if backends != nil {
+			arr, _ := backends.GetArray()
+			for i := range arr {
+				code, err := arr[i].Int("check_code")
+				if err != nil || code != 0 {
+					address, _ := arr[i].GetString("address")
+					out.BackendErrList = append(out.BackendErrList, address)
+				}
+				//if code != 0 {
+				//	name, _ := arr[i].GetString("name")
+				//	out.BackendErrList = append(out.BackendErrList, name)
+				//}
+			}
+		}
+		if len(out.BackendErrList) > 0 {
+			out.CheckStatus = "failed"
+		} else {
+			out.CheckStatus = "success"
+		}
+	}
 	return out, nil
 }
 
@@ -544,7 +573,7 @@ func (manager *SLoadbalancerListenerManager) FetchCustomizeColumns(
 			LoadbalancerAclResourceInfo:         lbaclRows[i],
 			LoadbalancerCertificateResourceInfo: lbcertRows[i],
 		}
-		rows[i], _ = objs[i].(*SLoadbalancerListener).getMoreDetails(rows[i])
+		rows[i], _ = objs[i].(*SLoadbalancerListener).getMoreDetails(rows[i], ctx, userCred)
 	}
 
 	return rows

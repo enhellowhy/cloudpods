@@ -240,16 +240,18 @@ func ParseServerDeployInfoList(list []string) ([]*computeapi.DeployConfig, error
 }
 
 type ServerConfigs struct {
-	Manager    string `help:"Preferred cloudprovider where virtual server should bd created" json:"prefer_manager"`
-	Region     string `help:"Preferred region where virtual server should be created" json:"prefer_region"`
-	Zone       string `help:"Preferred zone where virtual server should be created" json:"prefer_zone"`
-	Wire       string `help:"Preferred wire where virtual server should be created" json:"prefer_wire"`
-	Host       string `help:"Preferred host where virtual server should be created" json:"prefer_host"`
-	BackupHost string `help:"Perfered host where virtual backup server should be created"`
+	Manager        string `help:"Preferred cloudprovider where virtual server should bd created" json:"prefer_manager"`
+	Region         string `help:"Preferred region where virtual server should be created" json:"prefer_region"`
+	Zone           string `help:"Preferred zone where virtual server should be created" json:"prefer_zone"`
+	Wire           string `help:"Preferred wire where virtual server should be created" json:"prefer_wire"`
+	Host           string `help:"Preferred host where virtual server should be created" json:"prefer_host"`
+	BackupHost     string `help:"Perfered host where virtual backup server should be created"`
+	JumpServerNode string `help:"Preferred jumpserver node where virtual server should be created" json:"prefer_jumpserver_node"`
 
 	Hypervisor                   string `help:"Hypervisor type" choices:"kvm|esxi|baremetal|container|aliyun|azure|qcloud|aws|huawei|openstack|ucloud|zstack|google|ctyun|incloudsphere|bingocloud|cloudpods|ecloud|jdcloud|remotefile"`
 	ResourceType                 string `help:"Resource type" choices:"shared|prepaid|dedicated"`
 	Backup                       bool   `help:"Create server with backup server"`
+	JumpServer                   bool   `help:"Create server with jumpserver registry"`
 	AutoSwitchToBackupOnHostDown bool   `help:"Auto switch to backup server on host down"`
 
 	Schedtag []string `help:"Schedule policy, key = aggregate name, value = require|exclude|prefer|avoid" metavar:"<KEY:VALUE>"`
@@ -285,16 +287,18 @@ type ServerConfigs struct {
 
 func (o ServerConfigs) Data() (*computeapi.ServerConfigs, error) {
 	data := &computeapi.ServerConfigs{
-		PreferManager:    o.Manager,
-		PreferRegion:     o.Region,
-		PreferZone:       o.Zone,
-		PreferWire:       o.Wire,
-		PreferHost:       o.Host,
-		PreferBackupHost: o.BackupHost,
-		Hypervisor:       o.Hypervisor,
-		ResourceType:     o.ResourceType,
-		Backup:           o.Backup,
-		Count:            o.Count,
+		PreferManager:        o.Manager,
+		PreferRegion:         o.Region,
+		PreferZone:           o.Zone,
+		PreferWire:           o.Wire,
+		PreferHost:           o.Host,
+		PreferJumpServerNode: o.JumpServerNode,
+		PreferBackupHost:     o.BackupHost,
+		Hypervisor:           o.Hypervisor,
+		ResourceType:         o.ResourceType,
+		Backup:               o.Backup,
+		JumpServer:           o.JumpServer,
+		Count:                o.Count,
 	}
 	for i, d := range o.Disk {
 		disk, err := cmdline.ParseDiskConfig(d, i)

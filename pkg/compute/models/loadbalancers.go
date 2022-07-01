@@ -19,6 +19,10 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"yunion.io/x/onecloud/pkg/compute/options"
+	"yunion.io/x/onecloud/pkg/mcclient/auth"
+	"yunion.io/x/onecloud/pkg/mcclient/modules"
+	"yunion.io/x/pkg/gotypes"
 
 	"yunion.io/x/jsonutils"
 	"yunion.io/x/log"
@@ -397,6 +401,14 @@ func (lb *SLoadbalancer) PerformSyncstatus(ctx context.Context, userCred mcclien
 	return nil, StartResourceSyncStatusTask(ctx, userCred, lb, "LoadbalancerSyncstatusTask", "")
 }
 
+func (lb *SLoadbalancer) setUserId(ctx context.Context, userCred mcclient.TokenCredential, id string) error {
+	err := lb.SetMetadata(ctx, "user_id", id, userCred)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (lb *SLoadbalancer) PostCreate(ctx context.Context, userCred mcclient.TokenCredential, ownerId mcclient.IIdentityProvider, query jsonutils.JSONObject, data jsonutils.JSONObject) {
 	lb.SVirtualResourceBase.PostCreate(ctx, userCred, ownerId, query, data)
 	// NOTE lb.Id will only be available after BeforeInsert happens
@@ -408,6 +420,11 @@ func (lb *SLoadbalancer) PostCreate(ctx context.Context, userCred mcclient.Token
 	err := quotas.CancelPendingUsage(ctx, userCred, &pendingUsage, &pendingUsage, true)
 	if err != nil {
 		log.Errorf("CancelPendingUsage error %s", err)
+	}
+
+	userId, _ := data.GetString("user_id")
+	if len(userId) > 0 {
+		lb.setUserId(ctx, userCred, userId)
 	}
 
 	lb.SetStatus(userCred, api.LB_CREATING, "")
@@ -568,7 +585,8 @@ func (lb *SLoadbalancer) StartLoadBalancerCreateTask(ctx context.Context, userCr
 	if err != nil {
 		return err
 	}
-	task.ScheduleRun(nil)
+	//task.ScheduleRun(nil)
+	task.ScheduleRun(data)
 	return nil
 }
 
@@ -1409,6 +1427,48 @@ func (manager *SLoadbalancerManager) ListItemExportKeys(ctx context.Context,
 	return q, nil
 }
 
+func (self *SLoadbalancer) PerformChangeOwner(ctx context.Context, userCred mcclient.TokenCredential, query jsonutils.JSONObject, input apis.PerformChangeProjectOwnerInput) (jsonutils.JSONObject, error) {
+	listeners, err := self.GetLoadbalancerListeners()
+	if err != nil {
+		return nil, errors.Wrapf(err, "GetLoadbalancerListeners")
+	}
+	for i := range listeners {
+		listener := listeners[i]
+		_, err := listener.PerformChangeOwner(ctx, userCred, query, input)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// change owner for instance backend groups
+	bgs, err := self.GetLoadbalancerBackendgroups()
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to GetLoadbalancerBackendgroups")
+	}
+	for i := range bgs {
+		_, err := bgs[i].PerformChangeOwner(ctx, userCred, query, input)
+		if err != nil {
+			return nil, errors.Wrapf(err, "unable to change owner for backend group %s", bgs[i].GetId())
+		}
+		// change owner for instance backend
+		backends, err := bgs[i].GetBackends()
+		if err != nil {
+			return nil, errors.Wrapf(err, "unable to GetBackends for backend group %s", bgs[i].GetId())
+		}
+		for j := range backends {
+			_, err := backends[j].PerformChangeOwner(ctx, userCred, query, input)
+			if err != nil {
+				return nil, errors.Wrapf(err, "unable to change owner for backend %s", backends[i].GetId())
+			}
+		}
+	}
+	changOwner, err := self.SVirtualResourceBase.PerformChangeOwner(ctx, userCred, query, input)
+	if err != nil {
+		return nil, err
+	}
+	return changOwner, nil
+}
+
 func (self *SLoadbalancer) GetChangeOwnerCandidateDomainIds() []string {
 	return self.SManagedResourceBase.GetChangeOwnerCandidateDomainIds()
 }
@@ -1443,5 +1503,60 @@ func (self *SLoadbalancer) OnMetadataUpdated(ctx context.Context, userCred mccli
 	err := self.StartRemoteUpdateTask(ctx, userCred, true, "")
 	if err != nil {
 		log.Errorf("StartRemoteUpdateTask fail: %s", err)
+	}
+}
+
+func (self *SLoadbalancer) NotifyInitiatorFeishuLoadbalancerEvent(ctx context.Context, userCred mcclient.TokenCredential) {
+	contentTemplate := "**IT运维通知**\n您在私有云平台申请的负载均衡资源开通成功\n实例名称: %s\n服务地址: %s\n私有云控制台地址: [https://cloud.it.lixiangoa.com/](https://cloud.it.lixiangoa.com/)\n___\n如果您使用中遇到任何问题\n可以通过【IT机器人】进行反馈"
+	content := fmt.Sprintf(contentTemplate, self.Name, self.Address)
+	kwargs := jsonutils.NewDict()
+	kwargs.Add(jsonutils.NewString(content), "content")
+	kwargs.Add(jsonutils.NewInt(2), "platform")
+
+	s := auth.GetAdminSession(ctx, options.Options.Region, "")
+	var user jsonutils.JSONObject
+	//get user id
+	meta, _ := self.GetAllMetadata(nil)
+	userId := meta["user_id"]
+	if len(userId) > 0 {
+		user, _ = modules.UsersV3.Get(s, userId, nil)
+	} else {
+		user, _ = modules.UsersV3.Get(s, userCred.GetUserId(), nil)
+	}
+	if user == nil {
+		log.Errorln("NotifyInitiatorFeishuLoadbalancerEvent user is empty.")
+		return
+	}
+
+	//feishuUserId
+	var feishuUserId string
+	extra, _ := user.Get(modules.Extra)
+	if gotypes.IsNil(extra) {
+		log.Errorln("NotifyInitiatorFeishuLoadbalancerEvent user extra is empty.")
+		return
+	} else {
+		staffId, _ := extra.GetString("staff_id")
+		if staffId == "" {
+			log.Errorln("NotifyInitiatorFeishuLoadbalancerEvent user staff_id is empty.")
+			return
+		} else {
+			coaUser, _ := modules.CoaUsers.Get(s, staffId, nil)
+			if gotypes.IsNil(coaUser) {
+				log.Errorln("NotifyInitiatorFeishuLoadbalancerEvent coa user is empty.")
+				return
+			} else {
+				feishuUserId, _ = coaUser.GetString("feishu_user_id")
+				if feishuUserId == "" {
+					log.Errorln("NotifyInitiatorFeishuLoadbalancerEvent feishuUserId is empty.")
+					return
+				}
+			}
+		}
+	}
+
+	kwargs.Add(jsonutils.NewString(feishuUserId), "feishu_user_id")
+	_, err := modules.CoaUsers.SendMarkdownMessage(s, kwargs)
+	if err != nil {
+		log.Errorf("NotifyInitiatorFeishuLoadbalancerEvent send message error %v.", err)
 	}
 }

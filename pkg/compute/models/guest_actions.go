@@ -24,13 +24,21 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	devtool_api "yunion.io/x/onecloud/pkg/apis/devtool"
+	"yunion.io/x/onecloud/pkg/mcclient/modules"
+	"yunion.io/x/onecloud/pkg/mcclient/modules/devtool"
+	"yunion.io/x/onecloud/pkg/mcclient/modules/identity"
+	"yunion.io/x/onecloud/pkg/mcclient/modules/scheduler"
+	jsoptions "yunion.io/x/onecloud/pkg/mcclient/options"
+	"yunion.io/x/pkg/gotypes"
+	"yunion.io/x/pkg/util/osprofile"
 
+	"gopkg.in/fatih/set.v0"
 	"yunion.io/x/jsonutils"
 	"yunion.io/x/log"
 	"yunion.io/x/pkg/errors"
 	"yunion.io/x/pkg/tristate"
 	"yunion.io/x/pkg/util/fileutils"
-	"yunion.io/x/pkg/util/osprofile"
 	"yunion.io/x/pkg/util/regutils"
 	"yunion.io/x/pkg/util/sets"
 	"yunion.io/x/pkg/utils"
@@ -60,7 +68,6 @@ import (
 	"yunion.io/x/onecloud/pkg/mcclient/auth"
 	"yunion.io/x/onecloud/pkg/mcclient/modules/image"
 	"yunion.io/x/onecloud/pkg/mcclient/modules/notify"
-	"yunion.io/x/onecloud/pkg/mcclient/modules/scheduler"
 	"yunion.io/x/onecloud/pkg/util/billing"
 	"yunion.io/x/onecloud/pkg/util/httputils"
 	"yunion.io/x/onecloud/pkg/util/logclient"
@@ -1123,6 +1130,277 @@ func (self *SGuest) NotifyAdminServerEvent(ctx context.Context, event string, pr
 	notifyclient.SystemNotifyWithCtx(ctx, priority, event, kwargs)
 }
 
+func (self *SGuest) NotifyInitiatorFeishuServerEvent(ctx context.Context, userCred mcclient.TokenCredential) {
+	contentTemplate := "**IT运维通知**\n您在私有云平台申请的KVM虚拟机资源开通成功\n虚拟机名称: %s\n虚拟机IP地址为: %s\n___\n请通过[堡垒机](https://jumpserver.it.lixiangoa.com/)登录服务器\n[堡垒机使用说明文档](https://li.feishu.cn/wiki/wikcnNGQ59902Pfaku6dPYTlOHf)\n如果您使用中遇到任何问题\n可以通过【IT机器人】进行反馈"
+	content := fmt.Sprintf(contentTemplate, self.Name, self.getNotifyIps())
+	kwargs := jsonutils.NewDict()
+	kwargs.Add(jsonutils.NewString(content), "content")
+	kwargs.Add(jsonutils.NewInt(2), "platform")
+
+	s := auth.GetAdminSession(ctx, options.Options.Region)
+	var user jsonutils.JSONObject
+	//get user id
+	meta, _ := self.GetAllMetadata(ctx, userCred)
+	userData := meta["user_data"]
+	if len(userData) > 0 {
+		decodeData, _ := userdata.Decode(userData)
+		if len(decodeData) > 0 {
+			userData = decodeData
+			user, _ = identity.UsersV3.Get(s, userData, nil)
+		}
+	} else {
+		user, _ = identity.UsersV3.Get(s, userCred.GetUserId(), nil)
+	}
+	if user == nil {
+		log.Errorln("NotifyInitiatorFeishuServerEvent user is empty.")
+		return
+	}
+
+	//feishuUserId
+	var feishuUserId string
+	extra, _ := user.Get(modules.Extra)
+	if gotypes.IsNil(extra) {
+		log.Errorln("NotifyInitiatorFeishuServerEvent user extra is empty.")
+		return
+	} else {
+		staffId, _ := extra.GetString("staff_id")
+		if staffId == "" {
+			log.Errorln("NotifyInitiatorFeishuServerEvent user staff_id is empty.")
+			return
+		} else {
+			coaUser, _ := modules.CoaUsers.Get(s, staffId, nil)
+			if gotypes.IsNil(coaUser) {
+				log.Errorln("NotifyInitiatorFeishuServerEvent coa user is empty.")
+				return
+			} else {
+				feishuUserId, _ = coaUser.GetString("feishu_user_id")
+				if feishuUserId == "" {
+					log.Errorln("NotifyInitiatorFeishuServerEvent feishuUserId is empty.")
+					return
+				}
+			}
+		}
+	}
+
+	kwargs.Add(jsonutils.NewString(feishuUserId), "feishu_user_id")
+	_, err := modules.CoaUsers.SendMarkdownMessage(s, kwargs)
+	if err != nil {
+		log.Errorf("NotifyInitiatorFeishuServerEvent send message error %v.", err)
+	}
+}
+
+func (self *SGuest) NotifyRobotServerEvent(ctx context.Context, userCred mcclient.TokenCredential, event string, priority notify.TNotifyPriority, isCreate bool) {
+	kwargs := jsonutils.NewDict()
+	kwargs.Add(jsonutils.NewString(self.Name), "name")
+	kwargs.Add(jsonutils.NewString(self.getNotifyIps()), "ips")
+	host, _ := self.GetHost()
+	if host != nil {
+		brand := host.GetBrand()
+		if brand == api.CLOUD_PROVIDER_ONECLOUD {
+			//brand = api.ComputeI18nTable.Lookup(ctx, brand)
+			brand = "KVM"
+		}
+		kwargs.Add(jsonutils.NewString(brand), "brand")
+	}
+
+	s := auth.GetAdminSession(ctx, options.Options.Region)
+	var user jsonutils.JSONObject
+	//get user id
+	if isCreate {
+		meta, _ := self.GetAllMetadata(ctx, userCred)
+		userData := meta["user_data"]
+		if len(userData) > 0 {
+			decodeData, _ := userdata.Decode(userData)
+			if len(decodeData) > 0 {
+				userData = decodeData
+				user, _ = identity.UsersV3.Get(s, userData, nil)
+			}
+		} else {
+			user, _ = identity.UsersV3.Get(s, userCred.GetUserId(), nil)
+		}
+	} else {
+		user, _ = identity.UsersV3.Get(s, userCred.GetUserId(), nil)
+	}
+	if user == nil {
+		log.Errorln("NotifyRobotServerEvent user is empty.")
+		return
+	}
+
+	displayName, _ := user.GetString("displayname")
+	if displayName == "" {
+		displayName, _ = user.GetString("name")
+	}
+	kwargs.Add(jsonutils.NewString(displayName), "display_name")
+	//department
+	var department string
+	extra, _ := user.Get(modules.Extra)
+	if gotypes.IsNil(extra) {
+		department = displayName
+	} else {
+		staffId, _ := extra.GetString("staff_id")
+		if staffId == "" {
+			department = displayName
+		} else {
+			coaUser, _ := modules.CoaUsers.Get(s, staffId, nil)
+			if gotypes.IsNil(coaUser) {
+				department = displayName
+			} else {
+				departmentId, _ := coaUser.GetString("department_id")
+				if departmentId == "" {
+					department = displayName
+				} else {
+					departmentInfo, _ := modules.CoaUsers.GetDepartment(s, departmentId, nil)
+					if !gotypes.IsNil(departmentInfo) {
+						department, _ = departmentInfo.GetString("fullname")
+					}
+				}
+			}
+		}
+	}
+
+	var start time.Time
+	formatStr := "2006-01-02 15:04:05"
+	switch event {
+	case notifyclient.SERVER_CREATED_LARK:
+		start = self.CreatedAt
+		kwargs.Add(jsonutils.NewString(department), "department")
+		kwargs.Add(jsonutils.NewString(self.InstanceType), "instance_type")
+		kwargs.Add(jsonutils.NewInt(int64(self.VcpuCount)), "cpu")
+		kwargs.Add(jsonutils.NewInt(int64(self.VmemSize/1024)), "mem")
+		//kwargs.Add(jsonutils.NewInt(int64(self.getDiskSize()/1024)), "disk_size")
+		disks, _ := self.GetDisks()
+		diskSizeDesc := ""
+		for i, disk := range disks {
+			if i == len(disks)-1 {
+				diskSizeDesc += strconv.Itoa(disk.DiskSize / 1024)
+			} else {
+				diskSizeDesc += strconv.Itoa(disk.DiskSize/1024) + ","
+			}
+		}
+		kwargs.Add(jsonutils.NewString(diskSizeDesc), "disk_size")
+	case notifyclient.SERVER_RECYCLED_LARK:
+		start = self.PendingDeletedAt
+	case notifyclient.SERVER_DELETED_LARK:
+		start = self.DeletedAt
+	}
+	kwargs.Add(jsonutils.NewString(start.In(time.FixedZone("CST", 8*3600)).Format(formatStr)), "start_time")
+	kwargs.Add(jsonutils.NewString(time.Now().In(time.FixedZone("CST", 8*3600)).Format(formatStr)), "end_time")
+	tc, _ := self.GetTenantCache(ctx)
+	if tc != nil {
+		kwargs.Add(jsonutils.NewString(tc.Name), "tenant")
+	} else {
+		kwargs.Add(jsonutils.NewString(userCred.GetProjectName()), "tenant")
+	}
+	robotName := "Feishu Robot"
+	robot, _ := modules.NotifyRobot.GetByName(s, robotName, nil)
+	if gotypes.IsNil(robot) {
+		log.Errorln("NotifyRobotServerEvent robot is null.")
+		return
+	}
+	robotId, _ := robot.GetString("id")
+	err := notifyclient.NotifyRobotWithCtx(ctx, []string{robotId}, priority, event, kwargs)
+	if err != nil {
+		log.Errorln(err)
+	}
+}
+
+func (self *SGuest) NotifyRobotServerErrorEvent(ctx context.Context, userCred mcclient.TokenCredential, event string, priority notify.TNotifyPriority, reason string) {
+	kwargs := jsonutils.NewDict()
+	kwargs.Add(jsonutils.NewString(self.Name), "name")
+	host, _ := self.GetHost()
+	if host != nil {
+		brand := host.GetBrand()
+		if brand == api.CLOUD_PROVIDER_ONECLOUD {
+			//brand = api.ComputeI18nTable.Lookup(ctx, brand)
+			brand = "KVM"
+		}
+		kwargs.Add(jsonutils.NewString(brand), "brand")
+	}
+
+	kwargs.Add(jsonutils.NewString(reason), "reason")
+	//get user id
+	//s := auth.GetAdminSession(ctx, options.Options.Region, "")
+	//var user jsonutils.JSONObject
+	//meta, _ := self.GetAllMetadata(nil)
+	//userData := meta["user_data"]
+	//if len(userData) > 0 {
+	//	decodeData, _ := userdata.Decode(userData)
+	//	if len(decodeData) > 0 {
+	//		userData = decodeData
+	//		user, _ = modules.UsersV3.Get(s, userData, nil)
+	//	}
+	//} else {
+	//	user, _ = modules.UsersV3.Get(s, userCred.GetUserId(), nil)
+	//}
+	//if user == nil {
+	//	log.Errorln("NotifyRobotServerEvent user is empty.")
+	//	return
+	//}
+	statusMap := map[string]string{
+		api.VM_CREATE_FAILED:  "创建失败",
+		api.VM_DISK_FAILED:    "磁盘分配失败",
+		api.VM_DEPLOY_FAILED:  "部署失败",
+		api.VM_NETWORK_FAILED: "网络配置失败",
+		api.VM_DEVICE_FAILED:  "创建失败",
+	}
+
+	var status string
+	if v, ok := statusMap[self.GetStatus()]; ok {
+		status = v
+	} else {
+		status = statusMap[api.VM_CREATE_FAILED]
+	}
+
+	switch event {
+	case notifyclient.SERVER_CREATED_FAILED_LARK:
+		kwargs.Add(jsonutils.NewString(status), "status")
+	default:
+		kwargs.Add(jsonutils.NewString(status), "status")
+	}
+	//tc, _ := self.GetTenantCache(ctx)
+	//if tc != nil {
+	//	kwargs.Add(jsonutils.NewString(tc.Name), "tenant")
+	//} else {
+	//	kwargs.Add(jsonutils.NewString(userCred.GetProjectName()), "tenant")
+	//}
+	s := auth.GetAdminSession(ctx, options.Options.Region)
+	robotName := "Feishu Robot"
+	robot, _ := modules.NotifyRobot.GetByName(s, robotName, nil)
+	if gotypes.IsNil(robot) {
+		log.Errorln("NotifyRobotServerEvent robot is null.")
+		return
+	}
+	robotId, _ := robot.GetString("id")
+	err := notifyclient.NotifyRobotWithCtx(ctx, []string{robotId}, priority, event, kwargs)
+	if err != nil {
+		log.Errorln(err)
+	}
+}
+
+func (self *SGuest) StartDevToolScriptApply(ctx context.Context) error {
+	s := auth.GetAdminSession(ctx, options.Options.Region)
+
+	var monitorAgent = "monitor agent"
+	script, err := devtool.DevToolScripts.GetByName(s, monitorAgent, nil)
+	if err != nil {
+		log.Errorf("get devtool script err %v", err)
+		return err
+	}
+	scriptId, _ := script.GetString("id")
+	if scriptId == "" {
+		log.Errorln("get devtool script id is empty")
+		return err
+	}
+	input := new(devtool_api.ScriptApplyInput)
+	input.ServerID = self.Id
+	_, err = devtool.DevToolScripts.PerformAction(s, scriptId, "apply", jsonutils.Marshal(input))
+	if err != nil {
+		log.Errorf("devtool script apply error %v", err)
+		return err
+	}
+	return nil
+}
+
 func (self *SGuest) StartGuestStopTask(ctx context.Context, userCred mcclient.TokenCredential, isForce, stopCharging bool, parentTaskId string) error {
 	if len(parentTaskId) == 0 {
 		self.SetStatus(userCred, api.VM_START_STOP, "")
@@ -1816,7 +2094,6 @@ func (self *SGuest) attachIsolatedDevice(ctx context.Context, userCred mcclient.
 		return fmt.Errorf("Isolated device already attached to another guest: %s", dev.GuestId)
 	}
 	if dev.HostId !=
-
 		self.HostId {
 		return fmt.Errorf("Isolated device and guest are not located in the same host")
 	}
@@ -5239,6 +5516,175 @@ func (self *SGuest) startSwitchToClonedDisk(ctx context.Context, userCred mcclie
 		params.Set("block_jobs_ready", jsonutils.JSONTrue)
 		return params, nil
 	})
+	return nil
+}
+
+func (self *SGuest) JoinJumpServer(ctx context.Context, userCred mcclient.TokenCredential, input *api.ServerCreateInput, ip string) error {
+	//check assets
+	s := auth.GetAdminSession(ctx, "")
+	asset, err := modules.JsAsset.GetByIP(s, ip, nil)
+	if err != nil {
+		log.Errorf("get jumpserver asset fail for %s, %v", ip, err)
+		return err
+	}
+	if asset != nil {
+		return errors.Errorf("there is a %s jumpserver asset", ip)
+	}
+
+	in := new(jsoptions.JumpServerAssetCreateOptions)
+	in.Id = self.Id
+	in.Ip = ip
+	in.Hostname = self.Name
+	in.Nodes = []string{input.PreferJumpServerNode}
+	if self.GetOS() == osprofile.OS_TYPE_WINDOWS {
+		in.Platform = osprofile.OS_TYPE_WINDOWS
+		in.Port = 3389
+		in.Protocols = []string{"rdp/3389"}
+	} else {
+		in.Platform = osprofile.OS_TYPE_LINUX
+		in.Port = 22
+		in.AdminUser = "b8860425-7064-4286-9341-a5e63eba2da5"
+		in.Protocols = []string{"ssh/22"}
+	}
+
+	params, _ := in.Params()
+	asset, err = modules.JsAsset.Create(s, params)
+	if err != nil {
+		log.Errorf("create jumpserver asset %s failed: %v", ip, err)
+		return err
+	}
+	assetID, _ := asset.GetString("id")
+
+	//check user
+	var user jsonutils.JSONObject
+	meta, _ := self.GetAllMetadata(ctx, userCred)
+	userData := meta["user_data"]
+	if len(userData) > 0 {
+		decodeData, _ := userdata.Decode(userData)
+		if len(decodeData) > 0 {
+			userData = decodeData
+			user, _ = identity.UsersV3.Get(s, userData, nil)
+		}
+	} else {
+		user, _ = identity.UsersV3.Get(s, userCred.GetUserId(), nil)
+	}
+	if user == nil {
+		log.Errorf("get initiator user info error: %v", err)
+		return err
+	}
+	isSystemAccount, err := user.GetString("is_system_account")
+	if err != nil {
+		log.Errorf("get user.is_system_account info error: %v", err)
+		return err
+	}
+	if isSystemAccount == "true" {
+		log.Errorf("user is system account %s", userCred.GetUserName())
+		return err
+	}
+	email, _ := user.GetString("email")
+	if email == "" {
+		log.Errorf("user email is empty %s", userCred.GetUserName())
+		return err
+	}
+	jsUser, err := modules.JsAsset.GetUser(s, email, nil)
+	if err != nil {
+		log.Errorf("get jumpserver user fail for %s, %v", email, err)
+		return err
+	}
+	emailPrefix := strings.Split(email, "@")[0]
+	if jsUser == nil {
+		//create a user
+		userCreateOptions := new(jsoptions.JumpServerUserCreateOptions)
+		userCreateOptions.Username = emailPrefix
+		userCreateOptions.Name = emailPrefix
+		userCreateOptions.Email = email
+		userCreateOptions.Source = "ldap"
+		userParams, _ := userCreateOptions.Params()
+		jsUser, err = modules.JsAsset.CreateUser(s, userParams)
+		if err != nil {
+			log.Errorf("create jumpserver user fail for %s, %v", email, err)
+			return err
+		}
+	}
+	jsUserID, _ := jsUser.GetString("id")
+
+	//check perms
+	systemUsers := map[string]string{
+		//"VNC": "82e31af0-d081-4737-a5fc-d7b5df0fee28",
+		"SSH": "80cd157c-27e0-4d3b-88d2-3a201824df4e",
+		"RDP": "d1dbc92c-52e3-440c-a312-ca8843a2af8a",
+	}
+	var permName, systemUser string
+	if self.GetOS() == osprofile.OS_TYPE_WINDOWS {
+		permName = emailPrefix + "-RDP"
+		systemUser = systemUsers["RDP"]
+	} else {
+		permName = emailPrefix + "-SSH"
+		systemUser = systemUsers["SSH"]
+	}
+	jsPerm, err := modules.JsAsset.GetPermsByName(s, permName, nil)
+	if err != nil {
+		log.Errorf("get jumpserver asset perms fail for %s, %v", permName, err)
+		return err
+	}
+	if jsPerm == nil {
+		//create perms
+		permCreateOptions := new(jsoptions.JumpServerAssetPermsCreateOptions)
+		permCreateOptions.Name = permName
+		permCreateOptions.Users = []string{
+			jsUserID,
+		}
+		permCreateOptions.SystemUsers = []string{
+			systemUser,
+		}
+		permCreateOptions.Assets = []string{
+			assetID,
+		}
+		permCreateOptions.Actions = []string{"all"}
+		permParams, _ := permCreateOptions.Params()
+		_, err = modules.JsAsset.CreatePerms(s, permParams)
+		if err != nil {
+			log.Errorf("create jumpserver asset perms fail for %s, %v", permName, err)
+			return err
+		}
+	} else {
+		ret := new(jsoptions.JumpServerAssetPermsUpdateOptions)
+		err = jsPerm.Unmarshal(ret)
+		if err != nil {
+			log.Errorf("Unmarshal jumpserver asset perms fail for %s, %v", permName, err)
+			return err
+		}
+		permUpdateOptions := new(jsoptions.JumpServerAssetPermsUpdateOptions)
+		permUpdateOptions.Id = ret.Id
+		permUpdateOptions.Assets = make([]string, 0)
+		permUpdateOptions.Assets = append(permUpdateOptions.Assets, ret.Assets...)
+		permUpdateOptions.Users = make([]string, 0)
+		permUpdateOptions.Users = append(permUpdateOptions.Users, ret.Users...)
+		for i, id := range permUpdateOptions.Assets {
+			if id == assetID {
+				log.Infof("jumpserver asset perms %s have added for asset %s", permName, assetID)
+				break
+			}
+			if i == len(permUpdateOptions.Assets)-1 {
+				permUpdateOptions.Assets = append(permUpdateOptions.Assets, assetID)
+			}
+		}
+		for i, id := range permUpdateOptions.Users {
+			if id == jsUserID {
+				log.Infof("jumpserver asset perms %s have added for user %s", permName, jsUserID)
+				break
+			}
+			if i == len(permUpdateOptions.Users)-1 {
+				permUpdateOptions.Users = append(permUpdateOptions.Users, jsUserID)
+			}
+		}
+		permParams, _ := permUpdateOptions.Params()
+		_, err = modules.JsAsset.PatchPerms(s, permUpdateOptions.Id, permParams)
+		if err != nil {
+			log.Errorf("patch jumpserver asset perms fail for %s, %v", permName, err)
+			return err
+		}
+	}
 	return nil
 }
 

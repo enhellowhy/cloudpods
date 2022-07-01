@@ -51,6 +51,7 @@ require (
 	github.com/flynn/go-shlex v0.0.0-20150515145356-3f9db97f8568 // indirect
 	github.com/frankban/quicktest v1.14.0 // indirect
 	github.com/fsnotify/fsnotify v1.4.9
+	github.com/getsentry/sentry-go v0.11.0
 	github.com/ghodss/yaml v1.0.0
 	github.com/gin-gonic/gin v1.7.0
 	github.com/glycerine/go-unsnap-stream v0.0.0-20181221182339-f9677308dec2 // indirect
@@ -137,7 +138,6 @@ require (
 	google.golang.org/protobuf v1.26.0
 	gopkg.in/asn1-ber.v1 v1.0.0-20181015200546-f715ec2f112d // indirect
 	gopkg.in/fatih/set.v0 v0.2.1
-	gopkg.in/ini.v1 v1.44.0 // indirect
 	gopkg.in/ldap.v3 v3.0.3
 	gopkg.in/yaml.v2 v2.3.0
 	honnef.co/go/tools v0.0.1-2020.1.4 // indirect

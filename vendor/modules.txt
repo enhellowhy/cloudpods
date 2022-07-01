@@ -300,6 +300,11 @@ github.com/fernet/fernet-go
 github.com/flynn/go-shlex
 # github.com/fsnotify/fsnotify v1.4.9
 github.com/fsnotify/fsnotify
+# github.com/getsentry/sentry-go v0.11.0
+github.com/getsentry/sentry-go
+github.com/getsentry/sentry-go/internal/crypto/randutil
+github.com/getsentry/sentry-go/internal/debug
+github.com/getsentry/sentry-go/internal/ratelimit
 # github.com/ghodss/yaml v1.0.0
 github.com/ghodss/yaml
 # github.com/gin-contrib/sse v0.1.0
@@ -779,6 +784,7 @@ golang.org/x/net/proxy
 golang.org/x/net/publicsuffix
 golang.org/x/net/trace
 # golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
+golang.org/x/net/websocket
 golang.org/x/oauth2
 golang.org/x/oauth2/clientcredentials
 golang.org/x/oauth2/google
@@ -969,7 +975,7 @@ gopkg.in/asn1-ber.v1
 gopkg.in/fatih/set.v0
 # gopkg.in/inf.v0 v0.9.1
 gopkg.in/inf.v0
-# gopkg.in/ini.v1 v1.44.0
+# gopkg.in/ini.v1 v1.51.1
 gopkg.in/ini.v1
 # gopkg.in/ldap.v3 v3.0.3
 gopkg.in/ldap.v3

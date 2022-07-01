@@ -7,6 +7,7 @@ BUILD_DIR := $(ROOT_DIR)/_output
 BIN_DIR := $(BUILD_DIR)/bin
 BUILD_SCRIPT := $(ROOT_DIR)/build/build.sh
 DEB_BUILD_SCRIPT := $(ROOT_DIR)/build/build_deb.sh
+#DLV := true
 
 ifeq ($(ONECLOUD_CI_BUILD),)
 	GIT_COMMIT := $(shell git rev-parse --short HEAD)

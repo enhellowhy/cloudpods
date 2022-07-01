@@ -1998,6 +1998,7 @@ func (h *SHostInfo) OnCatalogChanged(catalog mcclient.KeystoneServiceCatalogV3) 
 		conf["kafka"] = map[string]interface{}{"brokers": urls, "topic": "telegraf"}
 	}
 	urls, _ = s.GetServiceURLs("influxdb", defaultEndpointType)
+	//urls, _ = catalog.GetServiceURLs("influxdb-cloud", options.HostOptions.Region, "", defaultEndpointType)
 	if len(urls) > 0 {
 		conf["influxdb"] = map[string]interface{}{"url": urls, "database": "telegraf"}
 	}

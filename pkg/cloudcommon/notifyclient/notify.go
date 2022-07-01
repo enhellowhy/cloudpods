@@ -357,6 +357,18 @@ func RawNotifyWithCtx(ctx context.Context, recipientId []string, isGroup bool, c
 	})
 }
 
+func RawNotifyIgnoreNonexistentReceiver(ctx context.Context, recipientId []string, isGroup bool, channel npk.TNotifyChannel, priority npk.TNotifyPriority, event string, data jsonutils.JSONObject) {
+	rawNotify(ctx, sNotifyParams{
+		recipientId:               recipientId,
+		isGroup:                   isGroup,
+		channel:                   channel,
+		priority:                  priority,
+		event:                     event,
+		data:                      data,
+		ignoreNonexistentReceiver: true,
+	})
+}
+
 func RawNotify(recipientId []string, isGroup bool, channel npk.TNotifyChannel, priority npk.TNotifyPriority, event string, data jsonutils.JSONObject) {
 	rawNotify(context.Background(), sNotifyParams{
 		recipientId: recipientId,

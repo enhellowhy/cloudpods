@@ -130,6 +130,8 @@ func (s *SGuestDHCPServer) getGuestConfig(guestDesc, guestNic jsonutils.JSONObje
 		}
 		if !strings.HasPrefix(strings.ToLower(osName), "win") {
 			route = append(route, []string{"0.0.0.0/0", nicdesc.Gateway})
+		} else {
+			conf.Domain = ""
 		}
 		route = append(route, []string{"169.254.169.254/32", nicdesc.Gateway})
 	}

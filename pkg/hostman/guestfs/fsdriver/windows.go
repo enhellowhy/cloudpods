@@ -49,6 +49,8 @@ const (
 
 	WIN_TELEGRAF_BINARY_PATH = "/opt/yunion/bin/telegraf.exe"
 	WIN_TELEGRAF_PATH        = "/Program Files/Telegraf"
+
+	ZABBIX_AGENT = "Zabbix Agent"
 )
 
 type SWindowsRootFs struct {
@@ -236,10 +238,10 @@ func (w *SWindowsRootFs) DeployHostname(part IDiskPartition, hostname, domain st
 
 	lines := []string{}
 	for k, v := range map[string]string{
-		"Hostname":    hostname,
-		"Domain":      domain,
+		"Hostname": hostname,
+		//"Domain":      domain,
 		"NV Hostname": hostname,
-		"NV Domain":   domain,
+		//"NV Domain":   domain,
 	} {
 		lines = append(lines, w.regAdd(TCPIP_PARAM_KEY, k, v, "REG_SZ"))
 	}
@@ -250,6 +252,10 @@ func (w *SWindowsRootFs) DeployHostname(part IDiskPartition, hostname, domain st
 	}
 	lines = append(lines, w.regAdd(ACTIVE_COMPUTER_NAME_KEY, "ComputerName", hostname, "REG_SZ"))
 	lines = append(lines, w.regAdd(COMPUTER_NAME_KEY, "ComputerName", hostname, "REG_SZ"))
+
+	//sc 'zabbix agent'
+	lines = append(lines, `SC CONFIG "Zabbix Agent" start=AUTO`)
+	lines = append(lines, `SC start "Zabbix Agent"`)
 	hostScripts := strings.Join(lines, "\r\n")
 	return w.putGuestScriptContents("/windows/hostnamecfg.bat", hostScripts)
 }
@@ -273,7 +279,8 @@ func (w *SWindowsRootFs) DeployHosts(part IDiskPartition, hn, domain string, ips
 	hf.Parse(oldHf)
 	hf.Add("127.0.0.1", "localhost")
 	for _, ip := range ips {
-		hf.Add(ip, getHostname(hn, domain), hn)
+		//hf.Add(ip, getHostname(hn, domain), hn)
+		hf.Add(ip, hn)
 	}
 	return w.rootFs.FilePutContents(ETC_HOSTS, hf.String(), false, true)
 }
@@ -334,9 +341,9 @@ func (w *SWindowsRootFs) DeployNetworkingScripts(rootfs IDiskPartition, nics []*
 				}
 			}
 
-			if len(snic.Domain) > 0 && snic.Ip == mainIp {
-				lines = append(lines, w.regAdd(TCPIP_PARAM_KEY, "SearchList", snic.Domain, "REG_SZ"))
-			}
+			//if len(snic.Domain) > 0 && snic.Ip == mainIp {
+			//	lines = append(lines, w.regAdd(TCPIP_PARAM_KEY, "SearchList", snic.Domain, "REG_SZ"))
+			//}
 		} else {
 			lines = append(lines, `      netsh interface ip set address "%%b" dhcp`)
 			lines = append(lines, `      netsh interface ip set dns "%%b" dhcp`)
@@ -515,6 +522,38 @@ func (w *SWindowsRootFs) deploySetupCompleteScripts(uname, passwd string) bool {
 		return false
 	}
 	return true
+}
+
+func (w *SWindowsRootFs) DeployUdevSubsystemScripts(part IDiskPartition) error {
+	bootScript := strings.Join([]string{
+		`set JOIN_DOMAIN_SCRIPT=%SystemRoot%\joindomain.bat`,
+		`if exist %JOIN_DOMAIN_SCRIPT% (`,
+		`    call %JOIN_DOMAIN_SCRIPT%`,
+		`    del %JOIN_DOMAIN_SCRIPT%`,
+		`)`,
+	}, "\r\n")
+	w.appendGuestBootScript("joindomain", bootScript)
+
+	joindomainScript := strings.Join([]string{
+		w.MakeGuestDebugCmd("joint domain step 1"),
+		strings.Join([]string{
+			`%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe`,
+			` -executionpolicy bypass %SystemRoot%\joindomain.ps1`,
+		}, ""),
+		`del %SystemRoot%\joindomain.ps1`,
+		w.MakeGuestDebugCmd("joint domain step 2"),
+	}, "\r\n")
+	err := w.putGuestScriptContents("/windows/joindomain.bat", joindomainScript)
+	if err != nil {
+		log.Errorln(err)
+		return err
+	}
+	err = w.putGuestScriptContents("/windows/joindomain.ps1", WinScriptJoinDomain)
+	if err != nil {
+		log.Errorln(err)
+		return err
+	}
+	return nil
 }
 
 func (w *SWindowsRootFs) DeployFstabScripts(rootFs IDiskPartition, disks []*deployapi.Disk) error {

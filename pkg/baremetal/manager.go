@@ -2444,7 +2444,7 @@ func (b *SBaremetalInstance) getTags() []influxdb.SKeyValue {
 		},
 		{
 			Key:   "manufacture",
-			Value: b.GetManufacture(),
+			Value: strings.ReplaceAll(b.GetManufacture(), ",", "."),
 		},
 		{
 			Key:   "model",

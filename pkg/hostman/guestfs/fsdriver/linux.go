@@ -90,7 +90,8 @@ func (l *sLinuxRootFs) DeployHosts(rootFs IDiskPartition, hostname, domain strin
 	hf.Parse(oldHostFile)
 	hf.Add("127.0.0.1", "localhost")
 	for _, ip := range ips {
-		hf.Add(ip, getHostname(hostname, domain), hostname)
+		//hf.Add(ip, getHostname(hostname, domain), hostname)
+		hf.Add(ip, hostname)
 	}
 	return rootFs.FilePutContents(etcHosts, hf.String(), false, false)
 }

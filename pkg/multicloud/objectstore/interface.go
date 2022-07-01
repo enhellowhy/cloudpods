@@ -34,6 +34,7 @@ type IBucketProvider interface {
 	GetVersion() string
 	GetAccountId() string
 	GetSubAccounts() ([]cloudprovider.SSubAccount, error)
+	GetSubAccountById(id int) (cloudprovider.SSubAccount, error)
 
 	GetObjectAcl(bucket, key string) (cloudprovider.TBucketACLType, error)
 	SetObjectAcl(bucket, key string, cannedAcl cloudprovider.TBucketACLType) error
@@ -41,4 +42,12 @@ type IBucketProvider interface {
 	SetIBucketAcl(name string, cannedAcl cloudprovider.TBucketACLType) error
 
 	// GetCapabilities() []string
+	GetObjectStoreStats() (map[string]interface{}, error)
+	GetObjectStoreUserStats() (map[string]interface{}, error)
+	GetObjectStoreUserSamples(from, interval string) (map[string]interface{}, error)
+	GetObjectStoreBucketSamples(name, from, interval string) (map[string]interface{}, error)
+	GetObjectStoreBucketUsages(name string) (map[string]interface{}, error)
+	CreateBucket(name string, storageClassStr string, versioned, worm bool, sizeBytesLimit int64, objectCntLimit int, acl string) (s3cli.BucketInfo, error)
+	CreateUser(name string) (int, error)
+	GetUserKey(name string) (string, string, error)
 }

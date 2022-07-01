@@ -154,6 +154,15 @@ func (cli *SObjectStoreClient) GetSubAccounts() ([]cloudprovider.SSubAccount, er
 	return []cloudprovider.SSubAccount{subAccount}, nil
 }
 
+func (cli *SObjectStoreClient) GetSubAccountById(id int) (cloudprovider.SSubAccount, error) {
+	subAccount := cloudprovider.SSubAccount{
+		Account:      cli.accessKey,
+		Name:         cli.cpcfg.Name,
+		HealthStatus: api.CLOUD_PROVIDER_HEALTH_NORMAL,
+	}
+	return subAccount, nil
+}
+
 func (cli *SObjectStoreClient) GetAccountId() string {
 	return cli.ownerId
 }
@@ -593,4 +602,36 @@ func (self *SObjectStoreClient) GetCapabilities() []string {
 		// cloudprovider.CLOUD_CAPABILITY_EVENT,
 	}
 	return caps
+}
+
+func (cli *SObjectStoreClient) GetObjectStoreStats() (map[string]interface{}, error) {
+	return nil, nil
+}
+
+func (cli *SObjectStoreClient) GetObjectStoreUserStats() (map[string]interface{}, error) {
+	return nil, nil
+}
+
+func (cli *SObjectStoreClient) GetObjectStoreUserSamples(from, interval string) (map[string]interface{}, error) {
+	return nil, nil
+}
+
+func (cli *SObjectStoreClient) GetObjectStoreBucketSamples(name, from, interval string) (map[string]interface{}, error) {
+	return nil, nil
+}
+
+func (cli *SObjectStoreClient) GetObjectStoreBucketUsages(name string) (map[string]interface{}, error) {
+	return nil, nil
+}
+
+func (cli *SObjectStoreClient) CreateBucket(name string, storageClassStr string, versioned, worm bool, sizeBytesLimit int64, objectCntLimit int, acl string) (s3cli.BucketInfo, error) {
+	return s3cli.BucketInfo{}, nil
+}
+
+func (cli *SObjectStoreClient) CreateUser(name string) (int, error) {
+	return -1, nil
+}
+
+func (cli *SObjectStoreClient) GetUserKey(name string) (string, string, error) {
+	return "", "", nil
 }

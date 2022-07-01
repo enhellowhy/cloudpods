@@ -16,6 +16,7 @@ package provider
 
 import (
 	"context"
+	"yunion.io/x/s3cli"
 
 	"yunion.io/x/jsonutils"
 	"yunion.io/x/pkg/errors"
@@ -145,6 +146,10 @@ func (self *SObjectStoreProvider) GetSubAccounts() ([]cloudprovider.SSubAccount,
 	return self.client.GetSubAccounts()
 }
 
+func (self *SObjectStoreProvider) GetSubAccountById(id int) (cloudprovider.SSubAccount, error) {
+	return self.client.GetSubAccountById(id)
+}
+
 func (self *SObjectStoreProvider) GetAccountId() string {
 	return self.client.GetAccountId()
 }
@@ -163,4 +168,36 @@ func (self *SObjectStoreProvider) GetObjectCannedAcls(regionId string) []string 
 
 func (self *SObjectStoreProvider) GetCapabilities() []string {
 	return self.client.GetCapabilities()
+}
+
+func (self *SObjectStoreProvider) GetObjectStoreStats() (map[string]interface{}, error) {
+	return self.client.GetObjectStoreStats()
+}
+
+func (self *SObjectStoreProvider) GetObjectStoreUserStats() (map[string]interface{}, error) {
+	return self.client.GetObjectStoreUserStats()
+}
+
+func (self *SObjectStoreProvider) GetObjectStoreUserSamples(from, interval string) (map[string]interface{}, error) {
+	return self.client.GetObjectStoreUserSamples(from, interval)
+}
+
+func (self *SObjectStoreProvider) GetObjectStoreBucketSamples(name, from, interval string) (map[string]interface{}, error) {
+	return self.client.GetObjectStoreBucketSamples(name, from, interval)
+}
+
+func (self *SObjectStoreProvider) GetObjectStoreBucketUsages(name string) (map[string]interface{}, error) {
+	return self.client.GetObjectStoreBucketUsages(name)
+}
+
+func (self *SObjectStoreProvider) CreateBucket(name string, storageClassStr string, versioned, worm bool, sizeBytesLimit int64, objectCntLimit int, acl string) (s3cli.BucketInfo, error) {
+	return self.client.CreateBucket(name, storageClassStr, versioned, worm, sizeBytesLimit, objectCntLimit, acl)
+}
+
+func (self *SObjectStoreProvider) CreateUser(name string) (int, error) {
+	return self.client.CreateUser(name)
+}
+
+func (self *SObjectStoreProvider) GetUserKey(name string) (string, string, error) {
+	return self.client.GetUserKey(name)
 }

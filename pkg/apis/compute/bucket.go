@@ -42,6 +42,12 @@ const (
 	BUCKET_UPLOAD_OBJECT_KEY_HEADER          = "X-Yunion-Bucket-Upload-Key"
 	BUCKET_UPLOAD_OBJECT_ACL_HEADER          = "X-Yunion-Bucket-Upload-Acl"
 	BUCKET_UPLOAD_OBJECT_STORAGECLASS_HEADER = "X-Yunion-Bucket-Upload-Storageclass"
+
+	USER_STATUS_BUILDING = "building"
+	USER_STATUS_ACTIVE   = "active"
+
+	CLOUD_PROVIDER_TYPE_NEW     = "new"
+	CLOUD_PROVIDER_TYPE_SPECIFY = "specify"
 )
 
 type BucketCreateInput struct {
@@ -49,7 +55,16 @@ type BucketCreateInput struct {
 	CloudregionResourceInput
 	CloudproviderResourceInput
 
-	StorageClass string `json:"storage_class"`
+	CloudproviderName string `json:"cloudprovider_name"`
+	CloudproviderType string `json:"cloudprovider_type"`
+	Cloudaccount      string `json:"cloudaccount"`
+
+	Versioned      bool   `json:"versioned"`
+	Worm           bool   `json:"worm"`
+	StorageClass   string `json:"storage_class"`
+	SizeBytesLimit int64  `json:"size_bytes_limit"`
+	ObjectCntLimit int    `json:"object_cnt_limit"`
+	UserId         string `json:"user_id"`
 }
 
 type BucketDetails struct {

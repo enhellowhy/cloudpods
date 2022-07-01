@@ -1250,6 +1250,19 @@ func (manager *SGuestManager) validateCreateData(
 		}
 	}
 
+	// create group
+	//if input.InstanceGroupName != "" && len(input.InstanceGroupIds) == 0 {
+	//	newGroupIds := make([]string, len(input.InstanceGroupIds))
+	//	for index, id := range input.InstanceGroupIds {
+	//		model, err := GroupManager.FetchByIdOrName(userCred, id)
+	//		if err != nil {
+	//			return nil, httperrors.NewResourceNotFoundError("no such group %s", id)
+	//		}
+	//		newGroupIds[index] = model.GetId()
+	//	}
+	//	// list of id or name ==> ids
+	//	input.InstanceGroupIds = newGroupIds
+	//}
 	// check group
 	if input.InstanceGroupIds != nil && len(input.InstanceGroupIds) != 0 {
 		newGroupIds := make([]string, len(input.InstanceGroupIds))
@@ -2017,8 +2030,47 @@ func (manager *SGuestManager) OnCreateComplete(ctx context.Context, items []db.I
 	if len(input.InstanceSnapshotId) > 0 {
 		manager.SetPropertiesWithInstanceSnapshot(ctx, userCred, input.InstanceSnapshotId, items)
 	}
+	if len(input.InstanceGroupName) > 0 {
+		hostCount := 1
+		granularity := 1
+
+		hosts := make([]SHost, 0)
+		q := HostManager.Query().Equals("enabled", true).
+			Equals("host_status", "online").Equals("host_type", api.HOST_TYPE_HYPERVISOR)
+		err := db.FetchModelObjects(HostManager, q, &hosts)
+		if err != nil {
+			log.Errorf("OnCreateComplete get hosts fail %s", err)
+		} else if len(hosts) != 0 {
+			hostCount = len(hosts)
+		}
+
+		//create group
+		s := auth.GetAdminSession(ctx, options.Options.Region, "")
+		params := jsonutils.NewDict()
+		params.Add(jsonutils.NewString(input.InstanceGroupName), "name")
+		params.Add(jsonutils.JSONFalse, "force_dispersion")
+		params.Add(jsonutils.NewString(input.ProjectId), "project_id")
+		params.Add(jsonutils.NewString(input.ProjectDomainId), "project_domain")
+
+		//not use input.Count, input.Count is 0
+		if len(items) > hostCount {
+			granularity = len(items) / hostCount
+		}
+		params.Add(jsonutils.NewInt(int64(granularity)), "granularity")
+		ret, err := modules.InstanceGroups.Create(s, params)
+		if err != nil {
+			log.Errorf("OnCreateComplete create group %s fail err %v", input.InstanceGroupName, err)
+		}
+
+		// input.GuestImageID maybe name of guestimage
+		if ret.Contains("id") {
+			id, _ := ret.GetString("id")
+			input.InstanceGroupIds = []string{id}
+		}
+	}
 	pendingUsage, pendingRegionUsage := getGuestResourceRequirements(ctx, userCred, input, ownerId, len(items), input.Backup)
-	err := RunBatchCreateTask(ctx, items, userCred, data, pendingUsage, pendingRegionUsage, "GuestBatchCreateTask", input.ParentTaskId)
+	//err := RunBatchCreateTask(ctx, items, userCred, data, pendingUsage, pendingRegionUsage, "GuestBatchCreateTask", input.ParentTaskId)
+	err := RunBatchCreateTask(ctx, items, userCred, jsonutils.Marshal(input), pendingUsage, pendingRegionUsage, "GuestBatchCreateTask", input.ParentTaskId)
 	if err != nil {
 		for i := range items {
 			guest := items[i].(*SGuest)
@@ -3561,16 +3613,20 @@ func (self *SGuest) CreateNetworksOnHost(
 	netArray []*api.NetworkConfig,
 	pendingUsage quotas.IQuota,
 	candidateNets []*schedapi.CandidateNet,
-) error {
+) ([]SGuestnetwork, error) {
+	var gns []SGuestnetwork
+	var err error
 	if len(netArray) == 0 {
 		netConfig := self.getDefaultNetworkConfig()
-		_, err := self.attach2RandomNetwork(ctx, userCred, host, netConfig, pendingUsage)
-		return errors.Wrap(err, "self.attach2RandomNetwork")
+		//_, err := self.attach2RandomNetwork(ctx, userCred, host, netConfig, pendingUsage)
+		//return errors.Wrap(err, "self.attach2RandomNetwork")
+		gns, err = self.attach2RandomNetwork(ctx, userCred, host, netConfig, pendingUsage)
+		return gns, errors.Wrap(err, "self.attach2RandomNetwork")
 	}
 	for idx := range netArray {
 		netConfig, err := parseNetworkInfo(userCred, netArray[idx])
 		if err != nil {
-			return errors.Wrapf(err, "parseNetworkInfo at %d", idx)
+			return nil, errors.Wrapf(err, "parseNetworkInfo at %d", idx)
 		}
 		var candidateNet *schedapi.CandidateNet
 		if len(candidateNets) > idx {
@@ -3580,12 +3636,13 @@ func (self *SGuest) CreateNetworksOnHost(
 		if candidateNet != nil {
 			networkIds = candidateNet.NetworkIds
 		}
-		_, err = self.attach2NetworkDesc(ctx, userCred, host, netConfig, pendingUsage, networkIds)
+		gns, err = self.attach2NetworkDesc(ctx, userCred, host, netConfig, pendingUsage, networkIds)
 		if err != nil {
-			return errors.Wrap(err, "self.attach2NetworkDesc")
+			return nil, errors.Wrap(err, "self.attach2NetworkDesc")
 		}
 	}
-	return nil
+	//return nil
+	return gns, nil
 }
 
 func (self *SGuest) attach2NetworkDesc(
@@ -3745,6 +3802,10 @@ func (self *SGuest) createDiskOnStorage(ctx context.Context, userCred mcclient.T
 		if err != nil {
 			return nil, err
 		}
+		//_, err = self.attach2NetworkDesc(ctx, userCred, host, netConfig, pendingUsage, networkIds)
+		//if err != nil {
+		//	return errors.Wrap(err, "self.attach2NetworkDesc")
+		//}
 	}
 
 	return disk, nil

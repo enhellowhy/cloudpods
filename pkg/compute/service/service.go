@@ -16,6 +16,8 @@ package service
 
 import (
 	"context"
+	"fmt"
+	"github.com/getsentry/sentry-go"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -97,6 +99,8 @@ func StartService() {
 
 	models.InitSyncWorkers(options.Options.CloudSyncWorkerCount)
 	tasks.InitCloudproviderSyncWorkers(options.Options.CloudProviderSyncWorkerCount)
+
+	sentry.CaptureMessage(fmt.Sprintf("%s sentry works!", app.GetName()))
 
 	var (
 		electObj        *elect.Elect

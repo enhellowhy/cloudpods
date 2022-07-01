@@ -1,0 +1,7 @@
+虚拟机名称: {{ .name }}
+项目: {{ .tenant }}
+IP地址: {{ .ips }}
+操作用户: {{ .display_name }}
+操作结果: 已回收
+回收时间: {{ .start_time }}
+完成时间: {{ .end_time }}

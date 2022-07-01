@@ -17,6 +17,7 @@ package tasks
 import (
 	"context"
 	"fmt"
+	"yunion.io/x/onecloud/pkg/mcclient/modules/notify"
 
 	"yunion.io/x/jsonutils"
 	"yunion.io/x/log"
@@ -174,7 +175,8 @@ func (self *GuestBatchCreateTask) allocateGuestOnHost(ctx context.Context, guest
 	pendingRegionUsage := models.SRegionQuota{}
 	self.GetPendingUsage(&pendingRegionUsage, 1)
 	// allocate networks
-	err = guest.CreateNetworksOnHost(ctx, self.UserCred, host, input.Networks, &pendingRegionUsage, candidate.Nets)
+	//err = guest.CreateNetworksOnHost(ctx, self.UserCred, host, input.Networks, &pendingRegionUsage, candidate.Nets)
+	gns, err := guest.CreateNetworksOnHost(ctx, self.UserCred, host, input.Networks, &pendingRegionUsage, candidate.Nets)
 	self.SetPendingUsage(&pendingRegionUsage, 1)
 	if err != nil {
 		log.Errorf("Network failed: %s", err)
@@ -280,6 +282,16 @@ func (self *GuestBatchCreateTask) allocateGuestOnHost(ctx context.Context, guest
 		guest.SetStatus(self.UserCred, api.VM_CREATE_FAILED, err.Error())
 		return err
 	}
+	// join jumpserver
+	if input.JumpServer && len(gns) != 0 {
+		ip := gns[0].IpAddr
+		err = guest.JoinJumpServer(ctx, self.UserCred, input, ip)
+		if err != nil {
+			log.Errorf("guest join jumpserver fail %s", err)
+			guest.SetStatus(self.UserCred, api.VM_CREATE_FAILED, err.Error())
+			return err
+		}
+	}
 	return nil
 }
 
@@ -296,6 +308,7 @@ func (self *GuestBatchCreateTask) SaveScheduleResult(ctx context.Context, obj IS
 		self.clearPendingUsage(ctx, guest)
 		db.OpsLog.LogEvent(guest, db.ACT_ALLOCATE_FAIL, err, self.UserCred)
 		logclient.AddActionLogWithStartable(self, obj, logclient.ACT_ALLOCATE, err, self.GetUserCred(), false)
+		guest.NotifyRobotServerErrorEvent(ctx, self.UserCred, notifyclient.SERVER_CREATED_FAILED_LARK, notify.NotifyPriorityCritical, err.Error())
 		notifyclient.EventNotify(ctx, self.GetUserCred(), notifyclient.SEventNotifyParam{
 			Obj:    guest,
 			Action: notifyclient.ActionCreateBackupServer,

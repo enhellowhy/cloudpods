@@ -276,7 +276,7 @@ func (p *SLoadbalancerAgentParamsTelegraf) updateBy(pp *SLoadbalancerAgentParams
 func (p *SLoadbalancerAgentParamsTelegraf) initDefault(data *jsonutils.JSONDict) {
 	if p.InfluxDbOutputUrl == "" {
 		baseOpts := &options.Options
-		u, _ := auth.GetServiceURL("influxdb", baseOpts.Region, "",
+		u, _ := auth.GetServiceURL("influxdb-cloud", baseOpts.Region, "",
 			identity_apis.EndpointInterfacePublic)
 		p.InfluxDbOutputUrl = u
 		p.InfluxDbOutputUnsafeSsl = true

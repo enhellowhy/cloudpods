@@ -46,6 +46,8 @@ type Service struct {
 
 func serviceComplete(serviceName, address string, port int) (url, checkUrl string, expectedCode int) {
 	switch serviceName {
+	case "influxdb-cloud":
+		return fmt.Sprintf("https://%s:%d", address, port), fmt.Sprintf("https://%s:%d/ping", address, port), 204
 	case "influxdb":
 		return fmt.Sprintf("https://%s:%d", address, port), fmt.Sprintf("https://%s:%d/ping", address, port), 204
 	case "repo":
@@ -57,6 +59,8 @@ func serviceComplete(serviceName, address string, port int) (url, checkUrl strin
 
 func serviceComplete2(service Service) (completeUrl string, expectedCode int) {
 	switch service.Name {
+	case "influxdb-cloud":
+		return fmt.Sprintf("%s/ping", service.Url), 204
 	case "influxdb":
 		return fmt.Sprintf("%s/ping", service.Url), 204
 	case "repo":

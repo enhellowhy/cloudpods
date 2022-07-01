@@ -56,8 +56,13 @@ func GetArgs(ctx context.Context, serverId, proxyEndpointId string, others inter
 		return nil, errors.Wrapf(err, "unable to get serverInfo of server %s", serverId)
 	}
 	influxdbUrl := info.serverDetails.MonitorUrl
+	//influxdbUrl, err := GetServiceUrl(ctx, "influxdb")
+	//influxdbUrl, err := GetServiceUrl(ctx, "influxdb-cloud")
+	//if err != nil {
+	//	return nil, errors.Wrap(err, "unable to get influxdbUrl")
+	//}
 	log.Infof("influxdbUrl: %s", influxdbUrl)
-	influxdbUrl, err = FindValidServiceUrl(ctx, Service{"influxdb", influxdbUrl}, proxyEndpointId, info, host)
+	influxdbUrl, err = FindValidServiceUrl(ctx, Service{"influxdb-cloud", influxdbUrl}, proxyEndpointId, info, host)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to convertInfluxdbUrl %s", influxdbUrl)
 	}

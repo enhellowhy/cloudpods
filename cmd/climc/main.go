@@ -37,6 +37,7 @@ import (
 	_ "yunion.io/x/onecloud/cmd/climc/shell/scheduledtask"
 	_ "yunion.io/x/onecloud/cmd/climc/shell/scheduler"
 	_ "yunion.io/x/onecloud/cmd/climc/shell/webconsole"
+	_ "yunion.io/x/onecloud/cmd/climc/shell/workflow"
 	_ "yunion.io/x/onecloud/cmd/climc/shell/yunionconf"
 )
 

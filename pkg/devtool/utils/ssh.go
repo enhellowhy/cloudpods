@@ -382,3 +382,37 @@ func ensureLocalForwardWork(host string, port int) bool {
 	}
 	return false
 }
+
+func CheckTcp(session *mcclient.ClientSession, serverId string) error {
+	params := jsonutils.NewDict()
+	params.Set("details", jsonutils.JSONTrue)
+	data, err := modules.Servers.GetById(session, serverId, params)
+	if err != nil {
+		err = errors.Wrapf(err, "unable to fetch server %s in check tcp", serverId)
+		return err
+	}
+	var serverDetail comapi.ServerDetails
+	err = data.Unmarshal(&serverDetail)
+	if err != nil {
+		err = errors.Wrapf(err, "unable to unmarshal %q to ServerDetails in check tcp", data)
+		return err
+	}
+
+	ips := strings.Split(serverDetail.IPs, ",")
+	if len(ips) == 0 {
+		err = fmt.Errorf("unable to get ip for server %s", serverDetail.Id)
+		return err
+	}
+	port, err := getServerSshport(session, serverDetail.Id)
+	if err != nil {
+		err = errors.Wrapf(err, "unable to get ssh port of server %s", serverDetail.Id)
+		return err
+	}
+	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", ips[0], port), time.Second*2)
+	defer conn.Close()
+	if err != nil {
+		err = fmt.Errorf("IPAddress %s:%d not accessible", ips[0], port)
+		return err
+	}
+	return nil
+}

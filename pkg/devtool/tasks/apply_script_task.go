@@ -16,6 +16,9 @@ package tasks
 
 import (
 	"context"
+	"fmt"
+	"time"
+	computeapi "yunion.io/x/onecloud/pkg/apis/compute"
 
 	"yunion.io/x/jsonutils"
 	"yunion.io/x/log"
@@ -107,12 +110,32 @@ func (self *ApplyScriptTask) OnInit(ctx context.Context, obj db.IStandaloneModel
 		return
 	}
 	session := auth.GetAdminSession(ctx, "")
+	serverJson, err := compute.Servers.GetById(session, sa.GuestId, nil)
+	if err != nil {
+		log.Errorf("get guest %s failed: %v", sa.GuestId, err)
+		self.taskFailed(ctx, sa, sar, err)
+		return
+	}
+	serverDetail := new(computeapi.ServerDetails)
+	err = serverJson.Unmarshal(serverDetail)
+	if err != nil {
+		log.Errorf("guest %s unmarshal failed: %v", sa.GuestId, err)
+		self.taskFailed(ctx, sa, sar, err)
+		return
+	}
+	if serverDetail.CreatedAt.Add(30*time.Minute).After(time.Now()) || serverDetail.Status != computeapi.VM_RUNNING {
+		self.SetStage("OnWaitServerSSHable", nil)
+		self.OnWaitServerSSHable(ctx, session, sa, sar)
+		return
+	}
+
 	sshable, cleanFunc, err := utils.CheckSSHable(session, sa.GuestId)
 	// check sshable
 	if err != nil {
 		self.taskFailed(ctx, sa, sar, err)
 		return
 	}
+
 	if cleanFunc != nil {
 		self.registerClean(func() {
 			err := cleanFunc()
@@ -163,6 +186,123 @@ func (self *ApplyScriptTask) OnInit(ctx context.Context, obj db.IStandaloneModel
 	if err != nil {
 		self.taskFailed(ctx, sa, sar, errors.Wrapf(err, "can't run ansible playbook reference %s", s.PlaybookReferenceId))
 		return
+	}
+}
+
+func (self *ApplyScriptTask) OnWaitServerSSHable(ctx context.Context, session *mcclient.ClientSession, sa *models.SScriptApply, sar *models.SScriptApplyRecord) {
+	retChan := make(chan bool, 1)
+
+	var waitLimit, waitinterval time.Duration
+	waitLimit = 10 * time.Minute
+	waitinterval = 1 * time.Minute
+	go self.check(session, sa.GuestId, retChan, waitLimit, waitinterval)
+
+	log.Infof("ApplyScriptTask waiting for server sshable ready")
+	for {
+		ret, ok := <-retChan
+		if !ok {
+			break
+		}
+		if ret == false {
+			log.Errorf("unable to ssh server %s", sa.GuestId)
+			err := fmt.Errorf("unable to ssh server %s", sa.GuestId)
+			self.taskFailed(ctx, sa, sar, err)
+			return
+		}
+	}
+	s, err := sa.Script()
+	if err != nil {
+		self.taskFailed(ctx, sa, sar, err)
+		return
+	}
+	sshable, cleanFunc, err := utils.CheckSSHable(session, sa.GuestId)
+	// check sshable
+	if err != nil {
+		self.taskFailed(ctx, sa, sar, err)
+		return
+	}
+	if cleanFunc != nil {
+		self.registerClean(func() {
+			err := cleanFunc()
+			if err != nil {
+				log.Errorf("unable to clean: %v", err)
+			}
+		})
+	}
+
+	host := ansible_api.AnsibleHost{
+		User: sshable.User,
+		IP:   sshable.Host,
+		Port: sshable.Port,
+		Name: sshable.ServerName,
+	}
+
+	// genrate args
+	params := jsonutils.NewDict()
+	if len(sa.ArgsGenerator) == 0 {
+		params.Set("args", sa.Args)
+	} else {
+		generator, ok := utils.GetArgGenerator(sa.ArgsGenerator)
+		if !ok {
+			params.Set("args", sa.Args)
+		}
+		arg, err := generator(ctx, sa.GuestId, sshable.ProxyEndpointId, &host)
+		if err != nil {
+			self.taskFailed(ctx, sa, sar, err)
+			return
+		}
+		params.Set("args", jsonutils.Marshal(arg))
+	}
+
+	params.Set("host", jsonutils.Marshal(host))
+
+	// fetch ansible playbook reference id
+	updateData := jsonutils.NewDict()
+	updateData.Set("script_apply_record_id", jsonutils.NewString(sar.GetId()))
+	self.SetStage("OnAnsiblePlaybookComplete", updateData)
+
+	// Inject Task Header
+	taskHeader := self.GetTaskRequestHeader()
+	session.Header.Set(mcclient.TASK_NOTIFY_URL, taskHeader.Get(mcclient.TASK_NOTIFY_URL))
+	session.Header.Set(mcclient.TASK_ID, taskHeader.Get(mcclient.TASK_ID))
+	_, err = ansible_modules.AnsiblePlaybookReference.PerformAction(session, s.PlaybookReferenceId, "run", params)
+	if err != nil {
+		self.taskFailed(ctx, sa, sar, errors.Wrapf(err, "can't run ansible playbook reference %s", s.PlaybookReferenceId))
+		return
+	}
+}
+
+func (self *ApplyScriptTask) check(session *mcclient.ClientSession, guestId string, retChan chan bool,
+	waitLimit, waitInterval time.Duration) {
+	timer := time.NewTimer(waitLimit)
+	ticker := time.NewTicker(waitInterval)
+	defer func() {
+		close(retChan)
+		ticker.Stop()
+		timer.Stop()
+		log.Debugf("finish all check jobs when applying")
+	}()
+	log.Debugf("guestId: %s", guestId)
+	time.Sleep(waitInterval)
+	count := 1
+	for {
+		select {
+		default:
+			e := utils.CheckTcp(session, guestId)
+			// check sshable
+			if e != nil {
+				log.Debugf("utils.CheckTcp failed: %s, count %d", e, count)
+				count++
+				<-ticker.C
+				continue
+			}
+			retChan <- true
+			return
+		case <-timer.C:
+			log.Errorf("some check jobs for test sshable timeout")
+			retChan <- false
+			return
+		}
 	}
 }
 

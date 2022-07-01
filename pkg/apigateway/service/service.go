@@ -16,6 +16,8 @@ package service
 
 import (
 	"math/rand"
+	"fmt"
+	"github.com/getsentry/sentry-go"
 	"net"
 	"os"
 	"strconv"
@@ -52,6 +54,7 @@ func StartService() {
 	serviceApp := app.NewApp(app_common.InitApp(baseOpts, false))
 	serviceApp.InitHandlers().Bind()
 
+	sentry.CaptureMessage(fmt.Sprintf("%s sentry works!", serviceApp.GetName()))
 	// mods, jmods := modulebase.GetRegisterdModules()
 	// log.Infof("Modules: %s", jsonutils.Marshal(mods).PrettyString())
 	// log.Infof("Modules: %s", jsonutils.Marshal(jmods).PrettyString())

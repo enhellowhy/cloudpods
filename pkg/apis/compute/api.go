@@ -260,6 +260,9 @@ type ServerConfigs struct {
 	// 调度使用指定宿主机
 	PreferHost string `json:"prefer_host_id"`
 
+	// 注册JumpServer
+	PreferJumpServerNode string `json:"prefer_jumpserver_node"`
+
 	// 主机高可用时，将备机调度到指定宿主机, 此参数仅对KVM生效
 	PreferBackupHost string `json:"prefer_backup_host"`
 
@@ -306,6 +309,11 @@ type ServerConfigs struct {
 	// required: false
 	Backup bool `json:"backup"`
 
+	// 虚拟机(创建备机)
+	// default: false
+	// required: false
+	JumpServer bool `json:"jumpserver"`
+
 	// 创建虚拟机数量
 	// default: 1
 	Count int `json:"count"`
@@ -332,6 +340,9 @@ type ServerConfigs struct {
 
 	// 主机组列表, 参数可以是主机组名称或ID,建议使用ID
 	InstanceGroupIds []string `json:"groups"`
+
+	// 新建主机组, 参数是主机组名称
+	InstanceGroupName string `json:"group_name"`
 
 	// DEPRECATE
 	Suggestion bool `json:"suggestion"`

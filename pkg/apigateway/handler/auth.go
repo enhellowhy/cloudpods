@@ -864,7 +864,7 @@ func getUserInfo2(s *mcclient.ClientSession, uid string, pid string, loginIp str
 	data := jsonutils.NewDict()
 	for _, k := range []string{
 		"displayname", "email", "id", "name",
-		"enabled", "mobile", "allow_web_console",
+		"enabled", "mobile", "avatar", "allow_web_console",
 		"created_at", "enable_mfa", "is_system_account",
 		"last_active_at", "last_login_ip",
 		"last_login_source",

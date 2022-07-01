@@ -110,6 +110,7 @@ func (h *AuthHandlers) getIdpSsoRedirectUri(ctx context.Context, w http.Response
 	query.(*jsonutils.JSONDict).Set("idp_nonce", jsonutils.NewString(utils.GenRequestId(4)))
 	state := base64.URLEncoding.EncodeToString([]byte(query.String()))
 	redirectUri := getSsoCallbackUrl(ctx, req, idpId)
+	redirectUri = "https://localhost:30300/api/v1/auth/ssologin"
 	s := auth.GetAdminSession(ctx, FetchRegion(req))
 	input := api.GetIdpSsoRedirectUriInput{
 		RedirectUri: redirectUri,
@@ -174,6 +175,23 @@ func (h *AuthHandlers) internalSsoLogin(ctx context.Context, w http.ResponseWrit
 		idpDriver = idpDriverC
 	}
 
+	//s := auth.GetAdminSession(ctx, FetchRegion(req))
+	//t := true
+	//input := api.GetOauth2IdpInput{
+	//	Admin:  &t,
+	//	Driver: api.IdentityDriverOAuth2,
+	//}
+	//resp, err := modules.IdentityProviders.List(s, jsonutils.Marshal(input))
+	//if err != nil {
+	//	httperrors.GeneralServerError(ctx, w, err)
+	//	return
+	//}
+	//if resp == nil || len(resp.Data) == 0 {
+	//	httperrors.ResourceNotFoundError(ctx, w, "missing oauth2 idp for feishu")
+	//	return
+	//}
+	//idpId, _ = resp.Data[0].GetString("id")
+	//idpDriver, _ = resp.Data[0].GetString("driver")
 	for _, k := range []string{"idp_id", "idp_driver", "idp_state", "idp_referer", "idp_link_user"} {
 		clearCookie(w, k, "")
 	}
@@ -254,6 +272,7 @@ func (h *AuthHandlers) internalSsoLogin(ctx context.Context, w http.ResponseWrit
 		}
 		if referer == "" {
 			referer = getSsoAuthCallbackUrl()
+			referer = "http://localhost:8080/auth"
 		}
 	}
 	refererUrl, _ := url.Parse(referer)
@@ -338,10 +357,10 @@ func processSsoLoginData(body jsonutils.JSONObject, cliIp string, redirectUri st
 		}
 		token, err = auth.Client().AuthenticateOIDC(idpId, code, redirectUri, "", "", "", cliIp)
 	case api.IdentityDriverOAuth2:
-		state, _ := body.GetString("state")
-		if state != idpState {
-			return nil, errors.Wrap(httperrors.ErrInputParameter, "state inconsistent")
-		}
+		//state, _ := body.GetString("state")
+		//if state != idpState {
+		//	return nil, errors.Wrap(httperrors.ErrInputParameter, "state inconsistent")
+		//}
 		code, _ := body.GetString("code")
 		if len(code) == 0 {
 			code, _ = body.GetString("auth_code")

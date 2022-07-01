@@ -32,11 +32,17 @@ const (
 	SERVICE_TYPE_NOTIFY            = "notify"
 	SERVICE_TYPE_MONITOR           = "monitor"
 	SERVICE_TYPE_LOG               = "log"
+	SERVICE_TYPE_WORKFLOW          = "workflow"
+	SERVICE_TYPE_BPM               = "bpm"
+	SERVICE_TYPE_ZABBIX            = "zabbix"
 	SERVICE_TYPE_REGION            = "compute"
 	SERVICE_TYPE_CLOUDMON          = "cloudmon"
 
-	SERVICE_TYPE_ETCD     = "etcd"
-	SERVICE_TYPE_INFLUXDB = "influxdb"
+	SERVICE_TYPE_ETCD           = "etcd"
+	SERVICE_TYPE_INFLUXDB       = "influxdb"
+	SERVICE_TYPE_INFLUXDB_CLOUD = "influxdb-cloud"
+	SERVICE_TYPE_COA            = "coa"
+	SERVICE_TYPE_JUMPSERVER     = "jumpserver"
 
 	SERVICE_TYPE_SCHEDULEDTASK = "scheduledtask"
 
@@ -68,6 +74,11 @@ var (
 		SERVICE_TYPE_KEYSTONE,
 		SERVICE_TYPE_ETCD,
 		SERVICE_TYPE_INFLUXDB,
+		SERVICE_TYPE_INFLUXDB_CLOUD,
+		SERVICE_TYPE_COA,
+		SERVICE_TYPE_JUMPSERVER,
+		SERVICE_TYPE_BPM,
+		SERVICE_TYPE_ZABBIX,
 	}
 )
 

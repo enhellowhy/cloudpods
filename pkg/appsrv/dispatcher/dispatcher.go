@@ -24,6 +24,7 @@ import (
 	"yunion.io/x/log"
 	"yunion.io/x/pkg/utils"
 
+	"yunion.io/x/onecloud/pkg/apis/workflow"
 	"yunion.io/x/onecloud/pkg/appctx"
 	"yunion.io/x/onecloud/pkg/appsrv"
 	"yunion.io/x/onecloud/pkg/cloudcommon/consts"
@@ -100,6 +101,12 @@ func AddModelDispatcher(prefix string, app *appsrv.Application, manager IModelDi
 		fmt.Sprintf("%s/%s/<resid>/<action>", prefix, manager.KeywordPlural()),
 		manager.Filter(performActionHandler), metadata, "perform_action", tags)
 	manager.CustomizeHandlerInfo(h)
+	if app.GetName() == workflow.SERVICE_TYPE {
+		h = app.AddHandler2("POST",
+			fmt.Sprintf("%s/%s", "bpm_callback", manager.KeywordPlural()),
+			manager.Filter(performCallbackActionHandler), metadata, "perform_action", tags)
+		manager.CustomizeHandlerInfo(h)
+	}
 	// batchUpdate
 	/* app.AddHandler2("PUT",
 	 	fmt.Sprintf("%s/%s", prefix, manager.KeywordPlural()),
@@ -414,6 +421,38 @@ func performActionHandler(ctx context.Context, w http.ResponseWriter, r *http.Re
 		data = jsonutils.NewDict()
 	}
 	result, err := manager.PerformAction(ctx, params["<resid>"], params["<action>"], mergeQueryParams(params, query, "<resid>", "<action>"), data)
+	if err != nil {
+		httperrors.GeneralServerError(ctx, w, err)
+		return
+	}
+	sendJSON(ctx, w, result, manager.Keyword())
+	// appsrv.SendJSON(w, wrapBody(result, manager.Keyword()))
+}
+
+func performCallbackActionHandler(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+	manager, params, query, body := fetchEnv(ctx, w, r)
+	var data jsonutils.JSONObject
+	if body != nil {
+		if body.Contains(manager.Keyword()) {
+			data, _ = body.Get(manager.Keyword())
+			if data == nil {
+				data = body.(*jsonutils.JSONDict)
+			}
+		} else {
+			data = body
+		}
+	} else {
+		data = jsonutils.NewDict()
+	}
+	bizParamsStr, _ := data.GetString("biz_params")
+	bizParams, _ := jsonutils.ParseString(bizParamsStr)
+	resId, err := bizParams.GetString("workflow_id")
+	if err != nil {
+		httperrors.GeneralServerError(ctx, w, err)
+		return
+	}
+	action, _ := bizParams.GetString("action")
+	result, err := manager.PerformAction(ctx, resId, action, mergeQueryParams(params, query, "<resid>", "<action>"), data)
 	if err != nil {
 		httperrors.GeneralServerError(ctx, w, err)
 		return

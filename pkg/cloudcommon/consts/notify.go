@@ -16,6 +16,7 @@ package consts
 
 var (
 	NotifyTemplateDir = "/opt/yunion/share/notify_templates"
+	//NotifyTemplateDir = "/Users/wanghuanyu/Documents/github.com/cloudpods.github/build/region/root/opt/yunion/share/notify_templates"
 )
 
 func SetNotifyTemplateDir(dir string) {

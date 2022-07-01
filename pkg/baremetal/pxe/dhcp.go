@@ -79,7 +79,7 @@ func (h *DHCPHandler) ServeDHCP(pkt dhcp.Packet, _ *net.UDPAddr, _ *net.Interfac
 	if req.RelayAddr.String() == "0.0.0.0" {
 		return nil, nil, fmt.Errorf("Request not from a DHCP relay, ignore mac: %s", req.ClientMac)
 	}
-	log.Infof("[DHCP] from relay %s packet, mac: %s", req.RelayAddr, req.ClientMac)
+	log.Debugf("[DHCP] from relay %s packet, mac: %s", req.RelayAddr, req.ClientMac)
 	conf, targets, err := req.fetchConfig(h.baremetalManager.GetClientSession())
 	if err != nil {
 		return nil, nil, err
@@ -234,7 +234,7 @@ func (req *dhcpRequest) fetchConfig(session *mcclient.ClientSession) (*dhcp.Resp
 			// from guestdhcp import GuestDHCPHelperTask
 			// task = GuestDHCPHelperTask(self)
 			// task.start()
-			log.Infof("Not found baremetal by mac: %s", req.ClientMac)
+			log.Debugf("Not found baremetal by mac: %s", req.ClientMac)
 			return nil, nil, nil
 		}
 		req.baremetalInstance = bmInstance

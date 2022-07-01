@@ -14,6 +14,17 @@
 
 package fsdriver
 
+const WinScriptJoinDomain = `
+
+$Username = "company\setup"
+$Password = 'D0ma1n@lx1'
+$pass = ConvertTo-SecureString -AsPlainText $Password -Force
+$Cred = New-Object System.Management.Automation.PSCredential -ArgumentList $Username,$pass
+Add-Computer -DomainName company.local -OUPath "OU=server,DC=company,DC=local" -Credential $Cred
+Remove-Item $script:MyInvocation.MyCommand.Path -Force
+
+`
+
 const WinScriptChangePassword = `
 
 $username = $args[0]

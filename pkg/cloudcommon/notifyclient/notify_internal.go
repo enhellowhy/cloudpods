@@ -239,6 +239,9 @@ func genMsgViaLang(ctx context.Context, p sNotifyParams) ([]npk.SNotifyMessage, 
 		langSuffix := notifyclientI18nTable.LookupByLang(lang, suffix)
 		msg := npk.SNotifyMessage{}
 		msg.Uid = t.reIds
+		//if p.channel == npk.NotifyFeishuRobot {
+		//	msg.Uid = make([]string, 0)
+		//}
 		msg.Priority = p.priority
 		msg.Robots = p.robots
 		msg.Contacts = t.contacts

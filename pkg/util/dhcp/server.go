@@ -121,7 +121,7 @@ func (s *DHCPServer) serveDHCP(handler DHCPHandler) error {
 
 			resp, targets, err := handler.ServeDHCP(pkt, addr, intf)
 			if err != nil {
-				log.Warningf("[DHCP] handler serve error: %v", err)
+				//log.Warningf("[DHCP] handler serve error: %v", err)
 				return
 			}
 			if resp == nil {

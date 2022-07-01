@@ -32,7 +32,8 @@ type sInfluxdbEndpointListener struct {
 }
 
 func (listener *sInfluxdbEndpointListener) OnServiceCatalogChange(catalog mcclient.IServiceCatalog) {
-	urls, err := auth.GetServiceURLs(apis.SERVICE_TYPE_INFLUXDB, options.Options.Region, "", "")
+	//urls, err := auth.GetServiceURLs(apis.SERVICE_TYPE_INFLUXDB, options.Options.Region, "", "")
+	urls, err := auth.GetServiceURLs(apis.SERVICE_TYPE_INFLUXDB_CLOUD, options.Options.Region, "", "")
 	if err != nil {
 		log.Debugf("sInfluxdbEndpointListener: no influxdb endpoints found, retry later...")
 		return

@@ -36,6 +36,7 @@ import (
 	_ "yunion.io/x/onecloud/cmd/climc/shell/notifyv2"
 	_ "yunion.io/x/onecloud/cmd/climc/shell/servicetree"
 	_ "yunion.io/x/onecloud/cmd/climc/shell/suggestion"
+	_ "yunion.io/x/onecloud/cmd/climc/shell/workflow"
 	_ "yunion.io/x/onecloud/cmd/climc/shell/yunionconf"
 )
 

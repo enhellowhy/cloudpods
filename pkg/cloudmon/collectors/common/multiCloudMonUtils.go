@@ -404,7 +404,7 @@ func JsonToMetric(obj *jsonutils.JSONDict, name string, tags map[string]string, 
 }
 
 func SendMetrics(s *mcclient.ClientSession, metrics []influxdb.SMetricData, debug bool, database string) error {
-	urls, err := s.GetServiceURLs("influxdb", o.Options.SessionEndpointType)
+	urls, err := s.GetServiceURLs("influxdb-cloud", o.Options.SessionEndpointType)
 	if err != nil {
 		return errors.Wrap(err, "GetServiceURLs")
 	}

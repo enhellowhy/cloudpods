@@ -24,6 +24,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"yunion.io/x/onecloud/pkg/apis"
 
 	"golang.org/x/sync/errgroup"
 
@@ -106,7 +107,8 @@ func (man *SDataSourceManager) initDefaultDataSource(ctx context.Context) error 
 			log.Errorf("get empty public session for region %s", region)
 			return
 		}
-		url, err := s.GetServiceURL("influxdb", epType)
+		//url, err := s.GetServiceURL("influxdb", epType)
+		url, err := s.GetServiceURL(apis.SERVICE_TYPE_INFLUXDB_CLOUD, epType)
 		if err != nil {
 			log.Errorf("get influxdb public url: %v", err)
 			return

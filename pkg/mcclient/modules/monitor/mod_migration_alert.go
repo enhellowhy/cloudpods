@@ -12,39 +12,34 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package modules
+package monitor
 
 import (
 	"yunion.io/x/onecloud/pkg/mcclient"
 	"yunion.io/x/onecloud/pkg/mcclient/modulebase"
+	"yunion.io/x/onecloud/pkg/mcclient/modules"
 )
 
-func registerCompute(mod modulebase.IBaseManager) {
-	registerComputeV1(mod)
-	registerComputeV2(mod)
+var (
+	MigrationAlertManager *SMigrationAlertManager
+)
+
+type SMigrationAlertManager struct {
+	*modulebase.ResourceManager
 }
 
-func registerComputeV1(mod modulebase.IBaseManager) {
-	modulebase.Register("v1", mod)
+func init() {
+	MigrationAlertManager = NewMigrationAlertManager()
+	modules.Register(MigrationAlertManager)
+	MigrationAlertManager.SetApiVersion(mcclient.V2_API_VERSION)
+	modules.RegisterV2(MigrationAlertManager)
 }
 
-func registerComputeV2(mod modulebase.IBaseManager) {
-	mod.SetApiVersion(mcclient.V2_API_VERSION)
-	modulebase.Register("v2", mod)
-}
-
-func register(mod modulebase.IBaseManager) {
-	modulebase.Register("v1", mod)
-}
-
-func registerV2(mod modulebase.IBaseManager) {
-	modulebase.Register("v2", mod)
-}
-
-func RegisterV2(mod modulebase.IBaseManager) {
-	modulebase.Register("v2", mod)
-}
-
-func Register(mod modulebase.IBaseManager) {
-	register(mod)
+func NewMigrationAlertManager() *SMigrationAlertManager {
+	m := modules.NewMonitorV2Manager("migrationalert", "migrationalerts",
+		[]string{"id", "name", "metric_type"},
+		[]string{})
+	return &SMigrationAlertManager{
+		ResourceManager: &m,
+	}
 }

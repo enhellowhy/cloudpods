@@ -16,6 +16,7 @@ package monitor
 
 import (
 	"yunion.io/x/onecloud/cmd/climc/shell"
+	"yunion.io/x/onecloud/pkg/mcclient/modulebase"
 	"yunion.io/x/onecloud/pkg/util/printutils"
 )
 
@@ -25,3 +26,9 @@ var (
 	printObject       = printutils.PrintJSONObject
 	printBatchResults = printutils.PrintJSONBatchResults
 )
+
+func NewResourceCmd(manager modulebase.IBaseManager) *shell.ResourceCmd {
+	cmd := shell.NewResourceCmd(manager)
+	cmd.SetPrefix("monitor")
+	return cmd
+}

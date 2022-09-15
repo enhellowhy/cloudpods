@@ -138,6 +138,12 @@ func NewWorkflowManager(keyword, keywordPlural string, columns, adminColumns []s
 		Keyword:     keyword, KeywordPlural: keywordPlural}
 }
 
+func NewMeterManager(keyword, keywordPlural string, columns, adminColumns []string) modulebase.ResourceManager {
+	return modulebase.ResourceManager{
+		BaseManager: *modulebase.NewBaseManager(apis.SERVICE_TYPE_METER_LI, "", "", columns, adminColumns),
+		Keyword:     keyword, KeywordPlural: keywordPlural}
+}
+
 func NewBpmManager(keyword, keywordPlural string, columns, adminColumns []string) modulebase.ResourceManager {
 	return modulebase.ResourceManager{
 		BaseManager: *modulebase.NewBaseManager(apis.SERVICE_TYPE_BPM, "", "", columns, adminColumns),

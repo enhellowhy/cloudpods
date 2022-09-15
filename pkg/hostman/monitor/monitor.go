@@ -326,6 +326,7 @@ type Monitor interface {
 	MigrateSetDowntime(dtSec float64, callback StringCallback)
 	MigrateSetCapability(capability, state string, callback StringCallback)
 	MigrateSetParameter(key string, val interface{}, callback StringCallback)
+	MigrateSetCacheSize(size string, callback StringCallback)
 	MigrateIncoming(address string, callback StringCallback)
 	Migrate(destStr string, copyIncremental, copyFull bool, callback StringCallback)
 	GetMigrateStatus(callback StringCallback)

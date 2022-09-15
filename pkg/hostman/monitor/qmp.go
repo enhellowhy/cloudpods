@@ -610,7 +610,7 @@ func (m *QmpMonitor) MigrateSetCapability(capability, state string, callback Str
 	m.Query(cmd, cb)
 }
 
-func (m *QmpMonitor) MigrateSetParameter(key string, val string, callback StringCallback) {
+func (m *QmpMonitor) MigrateSetParameter(key string, val interface{}, callback StringCallback) {
 	var (
 		cb = func(res *Response) {
 			callback(m.actionResult(res))
@@ -624,6 +624,11 @@ func (m *QmpMonitor) MigrateSetParameter(key string, val string, callback String
 	)
 
 	m.Query(cmd, cb)
+}
+
+func (m *QmpMonitor) MigrateSetCacheSize(size string, callback StringCallback) {
+	cmd := fmt.Sprintf("migrate_set_cache_size %s", size)
+	m.HumanMonitorCommand(cmd, callback)
 }
 
 func (m *QmpMonitor) MigrateIncoming(address string, callback StringCallback) {

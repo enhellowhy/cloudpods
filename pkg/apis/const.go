@@ -29,6 +29,7 @@ const (
 	SERVICE_TYPE_YUNIONCONF        = "yunionconf"
 	SERVICE_TYPE_YUNIONAGENT       = "yunionagent"
 	SERVICE_TYPE_METER             = "meter"
+	SERVICE_TYPE_METER_LI          = "meter-li"
 	SERVICE_TYPE_SCHEDULER         = "scheduler"
 	SERVICE_TYPE_ITSM              = "itsm"
 	SERVICE_TYPE_VNCPROXY          = "vncproxy"

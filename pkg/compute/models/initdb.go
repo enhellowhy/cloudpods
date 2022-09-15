@@ -55,6 +55,8 @@ func InitDB() error {
 		CachedLoadbalancerCertificateManager,
 		LoadbalancerClusterManager,
 		SchedtagManager,
+		ClusterManager,
+		DrsRecordManager,
 		DynamicschedtagManager,
 		ServerSkuManager,
 		ElasticcacheSkuManager,

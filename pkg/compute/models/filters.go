@@ -156,6 +156,12 @@ func rangeObjFilter(q *sqlchemy.SQuery, rangeObj db.IStandaloneModel, regionFiel
 			q = q.Join(storageschedtags, sqlchemy.Equals(storageschedtags.Field("storage_id"), storageField))
 			q = q.Filter(sqlchemy.Equals(storageschedtags.Field("schedtag_id"), rangeObj.GetId()))
 		}
+	case "cluster":
+		if hostField != nil {
+			hostclusters := HostclusterManager.Query("host_id", "cluster_id").SubQuery()
+			q = q.Join(hostclusters, sqlchemy.Equals(hostclusters.Field("host_id"), hostField))
+			q = q.Filter(sqlchemy.Equals(hostclusters.Field("cluster_id"), rangeObj.GetId()))
+		}
 	}
 	return q
 }

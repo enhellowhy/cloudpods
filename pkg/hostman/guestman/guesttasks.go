@@ -635,7 +635,27 @@ func (s *SGuestLiveMigrateTask) onSetZeroBlocks(res string) {
 		return
 	}
 	// https://wiki.qemu.org/Features/AutoconvergeLiveMigration
-	s.Monitor.MigrateSetCapability("auto-converge", "on", s.startMigrate)
+	//s.Monitor.MigrateSetCapability("auto-converge", "on", s.startMigrate)
+	s.Monitor.MigrateSetCapability("auto-converge", "on", s.onSetAutoConverge)
+}
+
+func (s *SGuestLiveMigrateTask) onSetAutoConverge(res string) {
+	if strings.Contains(strings.ToLower(res), "error") {
+		s.migrateTask = nil
+		hostutils.TaskFailed(s.ctx, fmt.Sprintf("Migrate set capability auto-converge error: %s", res))
+		return
+	}
+	//s.Monitor.MigrateSetCapability("xbzrle", "on", s.onSetXbzrle)
+	s.Monitor.MigrateSetCapability("xbzrle", "on", s.startMigrate)
+}
+
+func (s *SGuestLiveMigrateTask) onSetXbzrle(res string) {
+	if strings.Contains(strings.ToLower(res), "error") {
+		s.migrateTask = nil
+		hostutils.TaskFailed(s.ctx, fmt.Sprintf("Migrate set capability xbzrle error: %s", res))
+		return
+	}
+	s.Monitor.MigrateSetCacheSize("40m", s.startMigrate)
 }
 
 func (s *SGuestLiveMigrateTask) startRamMigrateTimeout() {
@@ -655,9 +675,24 @@ func (s *SGuestLiveMigrateTask) startRamMigrateTimeout() {
 func (s *SGuestLiveMigrateTask) startMigrate(res string) {
 	if strings.Contains(strings.ToLower(res), "error") {
 		s.migrateTask = nil
-		hostutils.TaskFailed(s.ctx, fmt.Sprintf("Migrate set capability auto-converge error: %s", res))
+		hostutils.TaskFailed(s.ctx, fmt.Sprintf("Migrate set capability xbzrle error: %s", res))
+		//hostutils.TaskFailed(s.ctx, fmt.Sprintf("Migrate set cache size error: %s", res))
 		return
 	}
+	s.Monitor.MigrateSetParameter("xbzrle-cache-size", 268435456, func(res string) {
+		if strings.Contains(strings.ToLower(res), "error") {
+			s.migrateTask = nil
+			hostutils.TaskFailed(s.ctx, fmt.Sprintf("Migrate set xbzrle-cache-size error: %s", res))
+			return
+		}
+	})
+	s.Monitor.MigrateSetParameter("max-bandwidth", 268435456, func(res string) {
+		if strings.Contains(strings.ToLower(res), "error") {
+			s.migrateTask = nil
+			hostutils.TaskFailed(s.ctx, fmt.Sprintf("Migrate set max-bandwidth error: %s", res))
+			return
+		}
+	})
 	if s.params.EnableTLS {
 		// https://wiki.qemu.org/Features/MigrationTLS
 		s.Monitor.ObjectAdd("tls-creds-x509", map[string]string{

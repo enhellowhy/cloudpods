@@ -162,6 +162,7 @@ func AddUsageHandler(prefix string, app *appsrv.Application) {
 		"zone":          rangeObjHandler(models.ZoneManager, ReportZoneUsage),
 		"wire":          rangeObjHandler(models.WireManager, ReportWireUsage),
 		"schedtag":      rangeObjHandler(models.SchedtagManager, ReportSchedtagUsage),
+		"cluster":       rangeObjHandler(models.ClusterManager, ReportClusterUsage),
 		"host":          rangeObjHandler(models.HostManager, ReportHostUsage),
 		"cloudaccount":  rangeObjHandler(models.CloudaccountManager, ReportCloudAccountUsage),
 		"cloudprovider": rangeObjHandler(models.CloudproviderManager, ReportCloudProviderUsage),
@@ -207,6 +208,10 @@ func ReportCloudProviderUsage(scope rbacutils.TRbacScope, userCred mcclient.IIde
 
 func ReportSchedtagUsage(scope rbacutils.TRbacScope, userCred mcclient.IIdentityProvider, isOwner bool, schedtags []db.IStandaloneModel, hostTypes []string, providers []string, brands []string, cloudEnv string, includeSystem bool, from, interval string) (Usage, error) {
 	return ReportGeneralUsage(scope, userCred, isOwner, schedtags, hostTypes, providers, brands, cloudEnv, includeSystem, from, interval)
+}
+
+func ReportClusterUsage(scope rbacutils.TRbacScope, userCred mcclient.IIdentityProvider, isOwner bool, clusters []db.IStandaloneModel, hostTypes []string, providers []string, brands []string, cloudEnv string, includeSystem bool, from, interval string) (Usage, error) {
+	return ReportGeneralUsage(scope, userCred, isOwner, clusters, hostTypes, providers, brands, cloudEnv, includeSystem, from, interval)
 }
 
 func ReportZoneUsage(scope rbacutils.TRbacScope, userCred mcclient.IIdentityProvider, isOwner bool, zones []db.IStandaloneModel, hostTypes []string, providers []string, brands []string, cloudEnv string, includeSystem bool, from, interval string) (Usage, error) {

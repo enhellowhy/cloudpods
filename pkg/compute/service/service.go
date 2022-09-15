@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+	"yunion.io/x/onecloud/pkg/controller/balancer"
 
 	_ "github.com/go-sql-driver/mysql"
 
@@ -187,6 +188,9 @@ func StartService() {
 
 		// init auto scaling controller
 		autoscaling.ASController.Init(options.Options.SASControllerOptions, cron)
+
+		// init auto balancer controller
+		balancer.BalancerController.Init(options.Options.CheckBalanceInterval, cron)
 	}
 
 	app_common.ServeForever(app, baseOpts)

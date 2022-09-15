@@ -19,6 +19,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
+	"yunion.io/x/log"
 
 	"yunion.io/x/jsonutils"
 	"yunion.io/x/pkg/errors"
@@ -28,6 +30,10 @@ import (
 	"yunion.io/x/onecloud/pkg/cloudprovider"
 	"yunion.io/x/onecloud/pkg/multicloud/objectstore"
 	"yunion.io/x/onecloud/pkg/util/httputils"
+)
+
+const (
+	OPS_ALL = "read,write,delete,bucket_manage"
 )
 
 type SXskyClient struct {
@@ -518,6 +524,43 @@ func (cli *SXskyClient) GetObjectStoreBucketUsages(name string) (map[string]inte
 func (cli *SXskyClient) CreateBucket(name string, storageClassStr string, versioned, worm bool, sizeBytesLimit int64, objectCntLimit int, acl string) (s3cli.BucketInfo, error) {
 	ctx := context.Background()
 	s3Bucket := s3cli.BucketInfo{}
+	maxBuckets := 0
+	usr, err := cli.adminApi.getUserById(ctx, cli.adminUser.Id)
+	if err != nil {
+		return s3cli.BucketInfo{}, errors.Wrap(err, "api.getUserById CreateBucket")
+	}
+	if usr.Status != api.USER_STATUS_ACTIVE {
+		return s3cli.BucketInfo{}, fmt.Errorf("user %s status is not active", usr.Name)
+	}
+	if usr.BucketNum != usr.MaxBuckets-1 || usr.OpMask != OPS_ALL {
+		if usr.BucketNum != usr.MaxBuckets {
+			log.Warningf("usr %s bucket num is %d, not equal max buckets %d", usr.Name, usr.BucketNum, usr.MaxBuckets)
+		}
+		if usr.OpMask != OPS_ALL {
+			log.Warningf("usr %s ops mask is %s", usr.Name, usr.OpMask)
+		}
+		maxBuckets = usr.BucketNum + 1
+		_, err = cli.adminApi.patchUserById(ctx, cli.adminUser.Id, maxBuckets)
+		if err != nil {
+			return s3cli.BucketInfo{}, errors.Wrap(err, "api.patchUserById CreateBucket")
+		}
+		// wait user status is from updating to active
+		for i := 0; i < 10; i++ {
+			time.Sleep(3 * time.Second)
+			u, err := cli.adminApi.getUserById(ctx, cli.adminUser.Id)
+			if err != nil {
+				return s3cli.BucketInfo{}, errors.Wrap(err, "api.getUserById CreateBucket")
+			}
+			if u.Status == api.USER_STATUS_ACTIVE && u.BucketNum == u.MaxBuckets-1 && u.OpMask == OPS_ALL {
+				log.Infof("user %s patch succeed", u.Name)
+				break
+			}
+			if i == 9 {
+				log.Warningf("user %s patch timeout, status is %s, bucket num is %d, max buckets %d", u.Name, u.Status, u.BucketNum, u.MaxBuckets)
+				return s3cli.BucketInfo{}, fmt.Errorf("user %s patch timeout 30s", u.Name)
+			}
+		}
+	}
 	bucket, err := cli.adminApi.createBucketByName(ctx, cli.adminUser.Id, name, storageClassStr, versioned, worm, sizeBytesLimit, objectCntLimit, acl)
 	if err != nil {
 		return s3cli.BucketInfo{}, errors.Wrap(err, "api.createBucketByName CreateBucket")

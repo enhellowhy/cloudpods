@@ -64,6 +64,7 @@ type HostListInput struct {
 	ZonalFilterListInput
 	WireFilterListInput
 	SchedtagFilterListInput
+	ClusterFilterListInput
 
 	StorageFilterListInput
 	UsableResourceListInput
@@ -154,6 +155,7 @@ type HostDetails struct {
 	SHost
 
 	Schedtags []SchedtagShortDescDetails `json:"schedtags"`
+	Clusters  []ClusterShortDescDetails  `json:"clusters"`
 
 	ServerId             string `json:"server_id"`
 	Server               string `json:"server"`

@@ -287,6 +287,17 @@ func (manager *SHostManager) ListItemFilter(
 		q = q.In("id", scopeQuery)
 	}
 
+	clusterStr := query.ClusterId
+	if len(clusterStr) > 0 {
+		cluster, _ := ClusterManager.FetchByIdOrName(nil, clusterStr)
+		if cluster == nil {
+			return nil, httperrors.NewResourceNotFoundError("Cluster %s not found", clusterStr)
+		}
+		hostclusters := HostclusterManager.Query().SubQuery()
+		scopeQuery := hostclusters.Query(hostclusters.Field("host_id")).Equals("cluster_id", cluster.GetId()).SubQuery()
+		q = q.In("id", scopeQuery)
+	}
+
 	wireStr := query.WireId
 	if len(wireStr) > 0 {
 		wire, _ := WireManager.FetchByIdOrName(nil, wireStr)
@@ -1642,6 +1653,14 @@ func (self *SHost) GetNotReadyGuestsMemorySize() (int, error) {
 		return -1, err
 	}
 	return stat.GuestVmemSize, nil
+}
+
+func (self *SHost) GetRunningGuestCpuCount() int {
+	res := self.getGuestsResource(api.VM_RUNNING)
+	if res != nil {
+		return res.GuestVcpuCount
+	}
+	return -1
 }
 
 func (self *SHost) GetRunningGuestMemorySize() int {
@@ -3030,6 +3049,7 @@ func (self *SHost) getMoreDetails(ctx context.Context, out api.HostDetails, show
 		out.NicInfo = nicInfos
 	}
 	out.Schedtags = GetSchedtagsDetailsToResourceV2(self, ctx)
+	out.Clusters = GetClustersDetailsToResourceV2(self, ctx)
 	var usage *SHostGuestResourceUsage
 	if options.Options.IgnoreNonrunningGuests {
 		usage = self.getGuestsResource(api.VM_RUNNING)
@@ -5542,6 +5562,10 @@ func (host *SHost) PerformStatus(ctx context.Context, userCred mcclient.TokenCre
 
 func (host *SHost) GetSchedtagJointManager() ISchedtagJointManager {
 	return HostschedtagManager
+}
+
+func (host *SHost) GetClusterJointManager() IClusterJointManager {
+	return HostclusterManager
 }
 
 func (host *SHost) PerformHostExitMaintenance(ctx context.Context, userCred mcclient.TokenCredential, query jsonutils.JSONObject, data jsonutils.JSONObject) (jsonutils.JSONObject, error) {

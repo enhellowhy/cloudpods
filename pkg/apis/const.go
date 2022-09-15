@@ -26,6 +26,7 @@ const (
 	SERVICE_TYPE_CLOUDMETA         = "cloudmeta"
 	SERVICE_TYPE_YUNIONCONF        = "yunionconf"
 	SERVICE_TYPE_METER             = "meter"
+	SERVICE_TYPE_METER_LI          = "meter-li"
 	SERVICE_TYPE_SCHEDULER         = "scheduler"
 	SERVICE_TYPE_VNCPROXY          = "vncproxy"
 	SERVICE_TYPE_KEYSTONE          = "identity"

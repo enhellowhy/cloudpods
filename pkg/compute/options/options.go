@@ -169,6 +169,8 @@ type ComputeOptions struct {
 	common_options.CommonOptions
 	common_options.DBOptions
 
+	CheckBalanceInterval int `help:"The interval between the two checks about balancing, unit: s" default:"60"`
+
 	EnableAutoMergeSecurityGroup bool `help:"Enable auto merge secgroup when sync security group from cloud, default False" default:"false"`
 	DeleteSnapshotExpiredRelease bool `help:"Should the virtual machine be automatically deleted when the virtual machine expires?" default:"false"`
 	DeleteEipExpiredRelease      bool `help:"Should the EIP  be automatically deleted when the virtual machine expires?" default:"false"`

@@ -742,6 +742,24 @@ func (s *SGuestLiveMigrateTask) onSetAutoConverge(res string) {
 	log.Infof("migrate src guest enable multifd")
 	s.Monitor.MigrateSetCapability("multifd", "on", cb)
 }
+//func (s *SGuestLiveMigrateTask) onSetAutoConverge(res string) {
+//	if strings.Contains(strings.ToLower(res), "error") {
+//		s.migrateTask = nil
+//		hostutils.TaskFailed(s.ctx, fmt.Sprintf("Migrate set capability auto-converge error: %s", res))
+//		return
+//	}
+//	//s.Monitor.MigrateSetCapability("xbzrle", "on", s.onSetXbzrle)
+//	s.Monitor.MigrateSetCapability("xbzrle", "on", s.startMigrate)
+//}
+//
+//func (s *SGuestLiveMigrateTask) onSetXbzrle(res string) {
+//	if strings.Contains(strings.ToLower(res), "error") {
+//		s.migrateTask = nil
+//		hostutils.TaskFailed(s.ctx, fmt.Sprintf("Migrate set capability xbzrle error: %s", res))
+//		return
+//	}
+//	s.Monitor.MigrateSetCacheSize("40m", s.startMigrate)
+//}
 
 func (s *SGuestLiveMigrateTask) startRamMigrateTimeout() {
 	if !s.timeoutAt.IsZero() {
@@ -758,6 +776,18 @@ func (s *SGuestLiveMigrateTask) startRamMigrateTimeout() {
 }
 
 func (s *SGuestLiveMigrateTask) startMigrate() {
+	//s.Monitor.MigrateSetParameter("xbzrle-cache-size", 268435456, func(res string) {
+	//	if strings.Contains(strings.ToLower(res), "error") {
+	//		s.migrateFailed(fmt.Sprintf("Migrate set xbzrle-cache-size error: %s", res))
+	//		return
+	//	}
+	//})
+	//s.Monitor.MigrateSetParameter("max-bandwidth", 268435456, func(res string) {
+	//	if strings.Contains(strings.ToLower(res), "error") {
+	//		s.migrateFailed(fmt.Sprintf("Migrate set max-bandwidth error: %s", res))
+	//		return
+	//	}
+	//})
 	if s.params.EnableTLS {
 		// https://wiki.qemu.org/Features/MigrationTLS
 		// first remove possible existing tls0

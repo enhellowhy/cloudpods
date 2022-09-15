@@ -433,13 +433,15 @@ func (api *SXskyAdminApi) getUserById(ctx context.Context, id int) (*sUser, erro
 
 type patchUserInput struct {
 	OsUser struct {
-		OpMask string
+		OpMask     string
+		MaxBuckets int
 	}
 }
 
-func (api *SXskyAdminApi) patchUserById(ctx context.Context, id int) (*sUser, error) {
+func (api *SXskyAdminApi) patchUserById(ctx context.Context, id int, maxBuckets int) (*sUser, error) {
 	input := &patchUserInput{}
-	input.OsUser.OpMask = "read,write,delete"
+	input.OsUser.OpMask = OPS_ALL
+	input.OsUser.MaxBuckets = maxBuckets
 	_, resp, err := api.authRequest(ctx, httputils.PATCH, fmt.Sprintf("/api/v1/os-users/%d", id), nil, jsonutils.Marshal(input))
 	if err != nil {
 		return nil, errors.Wrap(err, "api.authRequest.getUserById")
@@ -837,7 +839,8 @@ func (api *SXskyAdminApi) createBucketByName(ctx context.Context, userId int, na
 
 type createUserInput struct {
 	OsUser struct {
-		Name string
+		Name       string
+		MaxBuckets int
 	}
 }
 
@@ -849,6 +852,7 @@ func (api *SXskyAdminApi) createUser(ctx context.Context, name string) (*sUser, 
 
 	input := &createUserInput{}
 	input.OsUser.Name = name
+	input.OsUser.MaxBuckets = 1
 	_, resp, err := api.authRequest(ctx, httputils.POST, "/api/v1/os-users/", nil, jsonutils.Marshal(input))
 	if err != nil {
 		return nil, errors.Wrap(err, "api.authRequest os-users")

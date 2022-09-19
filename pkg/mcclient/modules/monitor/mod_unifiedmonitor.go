@@ -37,7 +37,7 @@ func init() {
 }
 
 func NewUnifiedMonitorManager() *SUnifiedMonitorManager {
-	man := modules.NewMonitorV2Manager("unifiedmonitor", "unifiedmonitors",
+	man := modules.NewMonitorV2Manager("unifiedmonitors", "unifiedmonitors",
 		[]string{},
 		[]string{})
 	return &SUnifiedMonitorManager{

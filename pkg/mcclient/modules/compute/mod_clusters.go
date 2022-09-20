@@ -12,10 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package modules
+package compute
 
 import (
 	"sync"
+	"yunion.io/x/onecloud/pkg/mcclient/modules"
 
 	"yunion.io/x/jsonutils"
 
@@ -69,9 +70,9 @@ func (this *ClusterManager) DoBatchClusterHostAddRemove(s *mcclient.ClientSessio
 }
 
 func init() {
-	Clusters = ClusterManager{NewComputeManager("cluster", "clusters",
+	Clusters = ClusterManager{modules.NewComputeManager("cluster", "clusters",
 		[]string{"ID", "Name", "Resource_type", "Domain_id", "Project_id", "Metadata"},
 		[]string{})}
 
-	registerCompute(&Clusters)
+	modules.RegisterCompute(&Clusters)
 }

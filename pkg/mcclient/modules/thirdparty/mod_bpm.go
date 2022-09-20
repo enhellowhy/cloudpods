@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package modules
+package thirdparty
 
 import (
 	"crypto/md5"
@@ -25,6 +25,8 @@ import (
 	"yunion.io/x/onecloud/pkg/apis"
 	"yunion.io/x/onecloud/pkg/mcclient"
 	"yunion.io/x/onecloud/pkg/mcclient/modulebase"
+	"yunion.io/x/onecloud/pkg/mcclient/modules"
+	"yunion.io/x/onecloud/pkg/mcclient/modules/identity"
 	"yunion.io/x/pkg/util/timeutils"
 )
 
@@ -41,12 +43,12 @@ var (
 )
 
 func init() {
-	BpmProcess = BpmProcessManager{NewBpmManager("bpm", "bpms",
+	BpmProcess = BpmProcessManager{modules.NewBpmManager("bpm", "bpms",
 		//[]string{"Id", "Name", "Key", "Enabled", "ExtraId"},
 		[]string{},
 		[]string{},
 	)}
-	register(&BpmProcess)
+	modulebase.Register(&BpmProcess)
 }
 
 func (this *BpmProcessManager) SubmitProcess(session *mcclient.ClientSession, params jsonutils.JSONObject) (jsonutils.JSONObject, error) {
@@ -55,11 +57,11 @@ func (this *BpmProcessManager) SubmitProcess(session *mcclient.ClientSession, pa
 	if err != nil {
 		return nil, err
 	}
-	appId, err := extra.GetString(AppId)
+	appId, err := extra.GetString(modules.AppId)
 	if err != nil {
 		return nil, err
 	}
-	secretKey, err := extra.GetString(SecretKey)
+	secretKey, err := extra.GetString(modules.SecretKey)
 	if err != nil {
 		return nil, err
 	}
@@ -88,11 +90,11 @@ func (this *BpmProcessManager) GetProcessHistorys(session *mcclient.ClientSessio
 	if err != nil {
 		return nil, err
 	}
-	appId, err := extra.GetString(AppId)
+	appId, err := extra.GetString(modules.AppId)
 	if err != nil {
 		return nil, err
 	}
-	secretKey, err := extra.GetString(SecretKey)
+	secretKey, err := extra.GetString(modules.SecretKey)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +104,7 @@ func (this *BpmProcessManager) GetProcessHistorys(session *mcclient.ClientSessio
 	}
 
 	body := jsonutils.NewDict()
-	body.Set(AppId, jsonutils.NewString(appId))
+	body.Set(modules.AppId, jsonutils.NewString(appId))
 	body.Set("sign_type", jsonutils.NewString("md5"))
 	body.Set("tenant_id", jsonutils.NewString("li"))
 	body.Set("biz_params", jsonutils.NewString(jsonutils.Marshal(bizParams).String()))
@@ -129,7 +131,7 @@ func (this *BpmProcessManager) GetProcessHistorys(session *mcclient.ClientSessio
 	if resp == nil {
 		return nil, fmt.Errorf("empty response")
 	}
-	code, err := resp.GetString(Code)
+	code, err := resp.GetString(modules.Code)
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +142,7 @@ func (this *BpmProcessManager) GetProcessHistorys(session *mcclient.ClientSessio
 	if code != "000000" {
 		return nil, fmt.Errorf("error: code %d", code)
 	}
-	data, err := resp.Get(Data)
+	data, err := resp.Get(modules.Data)
 	if err != nil {
 		return nil, err
 	}
@@ -148,8 +150,8 @@ func (this *BpmProcessManager) GetProcessHistorys(session *mcclient.ClientSessio
 }
 
 type ProcessList struct {
-	DoneList []*TaskProcess  `json:"done_list"`
-	TodoList []*TaskProcess  `json:"todo_list"`
+	DoneList []*TaskProcess `json:"done_list"`
+	TodoList []*TaskProcess `json:"todo_list"`
 }
 
 type TaskProcess struct {
@@ -200,11 +202,11 @@ func (this *BpmProcessManager) GetProcessList(session *mcclient.ClientSession, i
 }
 
 func (this *BpmProcessManager) getServiceExtra(session *mcclient.ClientSession) (jsonutils.JSONObject, error) {
-	result, err := ServicesV3.GetByName(session, apis.SERVICE_TYPE_BPM, nil)
+	result, err := identity.ServicesV3.GetByName(session, apis.SERVICE_TYPE_BPM, nil)
 	if err != nil {
 		return nil, err
 	}
-	extra, err := result.Get(Extra)
+	extra, err := result.Get(modules.Extra)
 	if err != nil {
 		return nil, err
 	}

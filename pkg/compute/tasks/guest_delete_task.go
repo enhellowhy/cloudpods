@@ -18,8 +18,8 @@ import (
 	"context"
 	"fmt"
 	"yunion.io/x/onecloud/pkg/mcclient/auth"
-	"yunion.io/x/onecloud/pkg/mcclient/modules"
 	"yunion.io/x/onecloud/pkg/mcclient/modules/notify"
+	"yunion.io/x/onecloud/pkg/mcclient/modules/thirdparty"
 
 	"yunion.io/x/jsonutils"
 	"yunion.io/x/log"
@@ -276,16 +276,16 @@ func (self *GuestDeleteTask) OnPendingDeleteComplete(ctx context.Context, obj db
 	self.SetStageComplete(ctx, nil)
 
 	// disable from zabbix
-	s := auth.GetAdminSession(ctx, "", "")
-	auth, err := modules.Zabbix.UserLogin(s)
+	s := auth.GetAdminSession(ctx, "")
+	auth, err := thirdparty.Zabbix.UserLogin(s)
 	if err != nil {
 		//logclient.AddActionLogWithContext(ctx, guest, logclient.ACT_PENDING_DELETE, "", self.UserCred, false)
 		log.Errorf("Zabbix user login failed: %v", err)
 		return
 	}
 	log.Infof("XXXXXX Zabbix user auth is %s", auth)
-	defer modules.Zabbix.UserLogout(s, auth)
-	hostId, err := modules.Zabbix.HostGet(s, auth, guest.Name, guest.GetRealIPs()[0])
+	defer thirdparty.Zabbix.UserLogout(s, auth)
+	hostId, err := thirdparty.Zabbix.HostGet(s, auth, guest.Name, guest.GetRealIPs()[0])
 	if err != nil {
 		log.Errorf("Zabbix get host failed: %v", err)
 		return
@@ -294,7 +294,7 @@ func (self *GuestDeleteTask) OnPendingDeleteComplete(ctx context.Context, obj db
 		log.Errorf("host does not exist in zabbix!")
 		return
 	}
-	_, err = modules.Zabbix.HostDisable(s, auth, hostId)
+	_, err = thirdparty.Zabbix.HostDisable(s, auth, hostId)
 	if err != nil {
 		log.Errorf("Disable host from zabbix failed: %v", err)
 	}
@@ -348,15 +348,15 @@ func (self *GuestDeleteTask) DoDeleteGuest(ctx context.Context, guest *models.SG
 	}
 
 	// delete from jumpserver
-	s := auth.GetAdminSession(ctx, "", "")
-	_, err := modules.JsAsset.Get(s, guest.Id, nil)
+	s := auth.GetAdminSession(ctx, "")
+	_, err := thirdparty.JsAsset.Get(s, guest.Id, nil)
 	if err != nil {
 		//db.OpsLog.LogEvent(guest, db.ACT_PENDING_DELETE, "delete from JumpServer failed", self.UserCred)
 		//logclient.AddActionLogWithContext(ctx, guest, logclient.ACT_PENDING_DELETE, "", self.UserCred, false)
 		log.Errorf("Delete from JumpServer failed: %v", err)
 		return
 	}
-	_, err = modules.JsAsset.Delete(s, guest.Id, nil)
+	_, err = thirdparty.JsAsset.Delete(s, guest.Id, nil)
 	if err != nil {
 		//logclient.AddActionLogWithContext(ctx, guest, logclient.ACT_PENDING_DELETE, "", self.UserCred, false)
 		log.Errorf("Delete from JumpServer failed: %v", err)
@@ -364,15 +364,15 @@ func (self *GuestDeleteTask) DoDeleteGuest(ctx context.Context, guest *models.SG
 	}
 
 	// delete from zabbix
-	auth, err := modules.Zabbix.UserLogin(s)
+	auth, err := thirdparty.Zabbix.UserLogin(s)
 	if err != nil {
 		//logclient.AddActionLogWithContext(ctx, guest, logclient.ACT_PENDING_DELETE, "", self.UserCred, false)
 		log.Errorf("Zabbix user login failed: %v", err)
 		return
 	}
 	log.Infof("XXXXXX Zabbix user auth is %s", auth)
-	defer modules.Zabbix.UserLogout(s, auth)
-	hostId, err := modules.Zabbix.HostGet(s, auth, guest.Name, guest.GetRealIPs()[0])
+	defer thirdparty.Zabbix.UserLogout(s, auth)
+	hostId, err := thirdparty.Zabbix.HostGet(s, auth, guest.Name, guest.GetRealIPs()[0])
 	if err != nil {
 		log.Errorf("Zabbix get host failed: %v", err)
 		return
@@ -381,7 +381,7 @@ func (self *GuestDeleteTask) DoDeleteGuest(ctx context.Context, guest *models.SG
 		log.Errorf("host does not exist in zabbix!")
 		return
 	}
-	_, err = modules.Zabbix.HostDelete(s, auth, hostId)
+	_, err = thirdparty.Zabbix.HostDelete(s, auth, hostId)
 	if err != nil {
 		log.Errorf("Delete host from zabbix failed: %v", err)
 	}

@@ -129,31 +129,37 @@ func NewVNCProxyManager() modulebase.ResourceManager {
 
 func NewWorkflowManager(keyword, keywordPlural string, columns, adminColumns []string) modulebase.ResourceManager {
 	return modulebase.ResourceManager{
-		BaseManager: *modulebase.NewBaseManager(apis.SERVICE_TYPE_WORKFLOW, "", "", columns, adminColumns),
+		BaseManager: *modulebase.NewBaseManager(apis.SERVICE_TYPE_WORKFLOW, "", "", columns, adminColumns, ""),
+		Keyword:     keyword, KeywordPlural: keywordPlural}
+}
+
+func NewMeterManager(keyword, keywordPlural string, columns, adminColumns []string) modulebase.ResourceManager {
+	return modulebase.ResourceManager{
+		BaseManager: *modulebase.NewBaseManager(apis.SERVICE_TYPE_METER_LI, "", "", columns, adminColumns, ""),
 		Keyword:     keyword, KeywordPlural: keywordPlural}
 }
 
 func NewBpmManager(keyword, keywordPlural string, columns, adminColumns []string) modulebase.ResourceManager {
 	return modulebase.ResourceManager{
-		BaseManager: *modulebase.NewBaseManager(apis.SERVICE_TYPE_BPM, "", "", columns, adminColumns),
+		BaseManager: *modulebase.NewBaseManager(apis.SERVICE_TYPE_BPM, "", "", columns, adminColumns, ""),
 		Keyword:     keyword, KeywordPlural: keywordPlural}
 }
 
 func NewZabbixManager(keyword, keywordPlural string, columns, adminColumns []string) modulebase.ResourceManager {
 	return modulebase.ResourceManager{
-		BaseManager: *modulebase.NewBaseManager(apis.SERVICE_TYPE_ZABBIX, "", "", columns, adminColumns),
+		BaseManager: *modulebase.NewBaseManager(apis.SERVICE_TYPE_ZABBIX, "", "", columns, adminColumns, ""),
 		Keyword:     keyword, KeywordPlural: keywordPlural}
 }
 
 func NewCoaManager(keyword, keywordPlural string, columns, adminColumns []string) modulebase.ResourceManager {
 	return modulebase.ResourceManager{
-		BaseManager: *modulebase.NewBaseManager(apis.SERVICE_TYPE_COA, "", "", columns, adminColumns),
+		BaseManager: *modulebase.NewBaseManager(apis.SERVICE_TYPE_COA, "", "", columns, adminColumns, ""),
 		Keyword:     keyword, KeywordPlural: keywordPlural}
 }
 
 func NewJumpServerManager(keyword, keywordPlural string, columns, adminColumns []string) modulebase.ResourceManager {
 	return modulebase.ResourceManager{
-		BaseManager: *modulebase.NewBaseManager(apis.SERVICE_TYPE_JUMPSERVER, "", "", columns, adminColumns),
+		BaseManager: *modulebase.NewBaseManager(apis.SERVICE_TYPE_JUMPSERVER, "", "", columns, adminColumns, ""),
 		Keyword:     keyword, KeywordPlural: keywordPlural}
 }
 

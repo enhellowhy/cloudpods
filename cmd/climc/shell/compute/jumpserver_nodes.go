@@ -12,34 +12,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 package compute
 
 import (
 	"yunion.io/x/onecloud/cmd/climc/shell"
 	"yunion.io/x/onecloud/pkg/mcclient"
-	"yunion.io/x/onecloud/pkg/mcclient/modules"
+	"yunion.io/x/onecloud/pkg/mcclient/modules/thirdparty"
 	"yunion.io/x/onecloud/pkg/mcclient/options"
 )
 
 func init() {
-	cmd := shell.NewResourceCmd(&modules.JsAsset)
+	cmd := shell.NewResourceCmd(&thirdparty.JsAsset)
 	cmd.Create(&options.JumpServerAssetCreateOptions{})
 	cmd.Delete(&options.BaseIdOptions{})
 	cmd.Show(&options.BaseIdOptions{})
 	R(&options.JumpServerNodeListOptions{}, "jsnode-list", "List jumpserver nodes", func(s *mcclient.ClientSession, args *options.JumpServerNodeListOptions) error {
-		result, err := modules.JsAsset.List(s, nil)
+		result, err := thirdparty.JsAsset.List(s, nil)
 		if err != nil {
 			return err
 		}
-		printList(result, modules.JsAsset.GetColumns(s))
+		printList(result, thirdparty.JsAsset.GetColumns(s))
 		return nil
 	})
 	type JumpServerAssetIpShowOptions struct {
 		Ip string `help:"ip of the js asset"`
 	}
 	R(&JumpServerAssetIpShowOptions{}, "jsassets-ipshow", "Show js user details", func(s *mcclient.ClientSession, args *JumpServerAssetIpShowOptions) error {
-		result, err := modules.JsAsset.GetByIP(s, args.Ip, nil)
+		result, err := thirdparty.JsAsset.GetByIP(s, args.Ip, nil)
 		if err != nil {
 			return err
 		}
@@ -50,7 +49,7 @@ func init() {
 		return nil
 	})
 	R(&options.JumpServerNodeListOptions{}, "jsuser-list", "List jumpserver users", func(s *mcclient.ClientSession, args *options.JumpServerNodeListOptions) error {
-		result, err := modules.JsAsset.ListUser(s, nil)
+		result, err := thirdparty.JsAsset.ListUser(s, nil)
 		if err != nil {
 			return err
 		}
@@ -62,7 +61,7 @@ func init() {
 		Email string `help:"email of the js user"`
 	}
 	R(&JumpServerUserShowOptions{}, "jsuser-show", "Show js user details", func(s *mcclient.ClientSession, args *JumpServerUserShowOptions) error {
-		result, err := modules.JsAsset.GetUser(s, args.Email, nil)
+		result, err := thirdparty.JsAsset.GetUser(s, args.Email, nil)
 		if err != nil {
 			return err
 		}
@@ -77,7 +76,7 @@ func init() {
 		if err != nil {
 			return err
 		}
-		result, err := modules.JsAsset.CreateUser(s, params)
+		result, err := thirdparty.JsAsset.CreateUser(s, params)
 		if err != nil {
 			return err
 		}
@@ -92,7 +91,7 @@ func init() {
 	//cmd.Perform("del-routes", &options.RouteTableDelRoutesOptions{})
 	//cmd.Perform("purge", &options.RouteTableIdOptions{})
 	R(&options.JumpServerNodeListOptions{}, "jsperms-list", "List jumpserver perms", func(s *mcclient.ClientSession, args *options.JumpServerNodeListOptions) error {
-		result, err := modules.JsAsset.ListAssetPerms(s, nil)
+		result, err := thirdparty.JsAsset.ListAssetPerms(s, nil)
 		if err != nil {
 			return err
 		}
@@ -104,7 +103,7 @@ func init() {
 		Name string `help:"name of the js perm"`
 	}
 	R(&JumpServerPermsShowOptions{}, "jsperms-show", "Show js perms details", func(s *mcclient.ClientSession, args *JumpServerPermsShowOptions) error {
-		result, err := modules.JsAsset.GetPermsByName(s, args.Name, nil)
+		result, err := thirdparty.JsAsset.GetPermsByName(s, args.Name, nil)
 		if err != nil {
 			return err
 		}
@@ -119,7 +118,7 @@ func init() {
 		if err != nil {
 			return err
 		}
-		result, err := modules.JsAsset.CreatePerms(s, params)
+		result, err := thirdparty.JsAsset.CreatePerms(s, params)
 		if err != nil {
 			return err
 		}
@@ -131,7 +130,7 @@ func init() {
 		if err != nil {
 			return err
 		}
-		result, err := modules.JsAsset.PatchPerms(s, args.Id, params)
+		result, err := thirdparty.JsAsset.PatchPerms(s, args.Id, params)
 		if err != nil {
 			return err
 		}

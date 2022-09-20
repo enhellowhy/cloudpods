@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package modules
+package thirdparty
 
 import (
 	"fmt"
@@ -21,6 +21,8 @@ import (
 	"yunion.io/x/onecloud/pkg/apis"
 	"yunion.io/x/onecloud/pkg/mcclient"
 	"yunion.io/x/onecloud/pkg/mcclient/modulebase"
+	"yunion.io/x/onecloud/pkg/mcclient/modules"
+	"yunion.io/x/onecloud/pkg/mcclient/modules/identity"
 )
 
 type CoaUsersManager struct {
@@ -32,13 +34,13 @@ var (
 )
 
 func init() {
-	CoaUsers = CoaUsersManager{NewCoaManager("coauser", "coausers",
+	CoaUsers = CoaUsersManager{modules.NewCoaManager("coauser", "coausers",
 		[]string{"ID", "Name", "Job_number", "Department_id", "User_name"},
 		[]string{"ID", "Name", "Job_number", "Department_id", "User_name"},
 		//[]string{},
 	)}
 
-	register(&CoaUsers)
+	modulebase.Register(&CoaUsers)
 }
 
 func (this *CoaUsersManager) Get(session *mcclient.ClientSession, id string, params jsonutils.JSONObject) (jsonutils.JSONObject, error) {
@@ -49,7 +51,7 @@ func (this *CoaUsersManager) Get(session *mcclient.ClientSession, id string, par
 	}
 
 	header := http.Header{}
-	header.Set(Authorization, "Bearer "+accessToken)
+	header.Set(modules.Authorization, "Bearer "+accessToken)
 	_, body, err := modulebase.JsonRequest(this.ResourceManager, session, "GET", path, header, params)
 	if err != nil {
 		return nil, err
@@ -57,18 +59,18 @@ func (this *CoaUsersManager) Get(session *mcclient.ClientSession, id string, par
 	if body == nil {
 		return nil, fmt.Errorf("empty response")
 	}
-	code, err := body.Int(Code)
+	code, err := body.Int(modules.Code)
 	if err != nil {
 		return nil, err
 	}
-	message, err := body.GetString(Message)
+	message, err := body.GetString(modules.Message)
 	if err != nil {
 		return nil, err
 	}
 	if code != 0 || message != "" {
 		return nil, fmt.Errorf("error: code %d, message '%s'", code, message)
 	}
-	data, err := body.Get(Data)
+	data, err := body.Get(modules.Data)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +85,7 @@ func (this *CoaUsersManager) GetDepartment(session *mcclient.ClientSession, id s
 	}
 
 	header := http.Header{}
-	header.Set(Authorization, "Bearer "+accessToken)
+	header.Set(modules.Authorization, "Bearer "+accessToken)
 	_, body, err := modulebase.JsonRequest(this.ResourceManager, session, "GET", path, header, params)
 	if err != nil {
 		return nil, err
@@ -91,18 +93,18 @@ func (this *CoaUsersManager) GetDepartment(session *mcclient.ClientSession, id s
 	if body == nil {
 		return nil, fmt.Errorf("empty response")
 	}
-	code, err := body.Int(Code)
+	code, err := body.Int(modules.Code)
 	if err != nil {
 		return nil, err
 	}
-	message, err := body.GetString(Message)
+	message, err := body.GetString(modules.Message)
 	if err != nil {
 		return nil, err
 	}
 	if code != 0 || message != "" {
 		return nil, fmt.Errorf("error: code %d, message '%s'", code, message)
 	}
-	data, err := body.Get(Data)
+	data, err := body.Get(modules.Data)
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +119,7 @@ func (this *CoaUsersManager) SendMarkdownMessage(session *mcclient.ClientSession
 	}
 
 	header := http.Header{}
-	header.Set(Authorization, "Bearer "+accessToken)
+	header.Set(modules.Authorization, "Bearer "+accessToken)
 	_, body, err := modulebase.JsonRequest(this.ResourceManager, session, "POST", path, header, params)
 	if err != nil {
 		return nil, err
@@ -125,18 +127,18 @@ func (this *CoaUsersManager) SendMarkdownMessage(session *mcclient.ClientSession
 	if body == nil {
 		return nil, fmt.Errorf("empty response")
 	}
-	code, err := body.Int(Code)
+	code, err := body.Int(modules.Code)
 	if err != nil {
 		return nil, err
 	}
-	message, err := body.GetString(Message)
+	message, err := body.GetString(modules.Message)
 	if err != nil {
 		return nil, err
 	}
 	if code != 0 || message != "success" {
 		return nil, fmt.Errorf("error: code %d, message '%s'", code, message)
 	}
-	data, err := body.Get(Data)
+	data, err := body.Get(modules.Data)
 	if err != nil {
 		return nil, err
 	}
@@ -144,15 +146,15 @@ func (this *CoaUsersManager) SendMarkdownMessage(session *mcclient.ClientSession
 }
 
 func (this *CoaUsersManager) getServiceAuthorizationToken(session *mcclient.ClientSession) (string, error) {
-	result, err := ServicesV3.GetByName(session, apis.SERVICE_TYPE_COA, nil)
+	result, err := identity.ServicesV3.GetByName(session, apis.SERVICE_TYPE_COA, nil)
 	if err != nil {
 		return "", err
 	}
-	extra, err := result.Get(Extra)
+	extra, err := result.Get(modules.Extra)
 	if err != nil {
 		return "", err
 	}
-	token, err := extra.GetString(AccessToken)
+	token, err := extra.GetString(modules.AccessToken)
 	if err != nil {
 		return "", err
 	}

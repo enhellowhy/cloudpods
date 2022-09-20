@@ -61,7 +61,7 @@ func (self *MachineApplyRetryTask) OnInit(ctx context.Context, obj db.IStandalon
 		return
 	}
 
-	session := auth.GetAdminSession(ctx, options.Options.Region, "")
+	session := auth.GetAdminSession(ctx, options.Options.Region)
 	self.UserCred = session.GetToken()
 
 	count, _ := body.Get("count")

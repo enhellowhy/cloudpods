@@ -35,7 +35,7 @@ func init() {
 		[]string{},
 		[]string{},
 	)}
-	register(&BillResources)
+	Register(&BillResources)
 }
 
 func (this *BillResourceManager) List(session *mcclient.ClientSession, params jsonutils.JSONObject) (*modulebase.ListResult, error) {

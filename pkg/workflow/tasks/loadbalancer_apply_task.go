@@ -27,7 +27,7 @@ import (
 	"yunion.io/x/onecloud/pkg/cloudcommon/db/taskman"
 	"yunion.io/x/onecloud/pkg/mcclient"
 	"yunion.io/x/onecloud/pkg/mcclient/auth"
-	"yunion.io/x/onecloud/pkg/mcclient/modules"
+	computemod "yunion.io/x/onecloud/pkg/mcclient/modules/compute"
 	"yunion.io/x/onecloud/pkg/util/httputils"
 	"yunion.io/x/onecloud/pkg/util/logclient"
 	"yunion.io/x/onecloud/pkg/workflow/models"
@@ -65,10 +65,10 @@ func (self *LoadbalancerApplyTask) OnInit(ctx context.Context, obj db.IStandalon
 		return
 	}
 
-	session := auth.GetSession(ctx, self.UserCred, options.Options.Region, "")
+	session := auth.GetSession(ctx, self.UserCred, options.Options.Region)
 	valid := self.UserCred.IsValid()
 	if !valid {
-		session = auth.GetAdminSession(ctx, options.Options.Region, "")
+		session = auth.GetAdminSession(ctx, options.Options.Region)
 		self.UserCred = session.GetToken()
 	}
 
@@ -132,7 +132,7 @@ func (self *LoadbalancerApplyTask) createInstances(session *mcclient.ClientSessi
 	}
 	//count := 1
 
-	ret, err := modules.Loadbalancers.Create(session, params)
+	ret, err := computemod.Loadbalancers.Create(session, params)
 	if err != nil {
 		clientErr := err.(*httputils.JSONClientError)
 		failedList = append(failedList, clientErr.Details)
@@ -160,7 +160,7 @@ func (self *LoadbalancerApplyTask) checkAllLbs(session *mcclient.ClientSession, 
 		select {
 		default:
 			for _, id := range lbIDSet.UnsortedList() {
-				ret, e := modules.Loadbalancers.GetSpecific(session, id, "status", nil)
+				ret, e := computemod.Loadbalancers.GetSpecific(session, id, "status", nil)
 				if e != nil {
 					log.Errorf("Loadbalancers.GetSpecific failed: %s", e)
 					<-ticker.C

@@ -23,13 +23,13 @@ import (
 	"yunion.io/x/log"
 	"yunion.io/x/onecloud/pkg/apis/compute"
 	apis "yunion.io/x/onecloud/pkg/apis/workflow"
+	computemod "yunion.io/x/onecloud/pkg/mcclient/modules/compute"
 	"yunion.io/x/pkg/util/sets"
 	//"yunion.io/x/onecloud/pkg/cloudcommon/cmdline"
 	"yunion.io/x/onecloud/pkg/cloudcommon/db"
 	"yunion.io/x/onecloud/pkg/cloudcommon/db/taskman"
 	"yunion.io/x/onecloud/pkg/mcclient"
 	"yunion.io/x/onecloud/pkg/mcclient/auth"
-	"yunion.io/x/onecloud/pkg/mcclient/modules"
 	"yunion.io/x/onecloud/pkg/util/httputils"
 	"yunion.io/x/onecloud/pkg/util/logclient"
 	"yunion.io/x/onecloud/pkg/workflow/options"
@@ -67,10 +67,10 @@ func (self *MachineChangeConfigTask) OnInit(ctx context.Context, obj db.IStandal
 		return
 	}
 
-	session := auth.GetSession(ctx, self.UserCred, options.Options.Region, "")
+	session := auth.GetSession(ctx, self.UserCred, options.Options.Region)
 	valid := self.UserCred.IsValid()
 	if !valid {
-		session = auth.GetAdminSession(ctx, options.Options.Region, "")
+		session = auth.GetAdminSession(ctx, options.Options.Region)
 		self.UserCred = session.GetToken()
 	}
 
@@ -126,7 +126,7 @@ func (self *MachineChangeConfigTask) changeInstances(session *mcclient.ClientSes
 
 	count := len(ids)
 	if count == 1 {
-		ret, err := modules.Servers.PerformAction(session, ids[0], "change-config", params)
+		ret, err := computemod.Servers.PerformAction(session, ids[0], "change-config", params)
 		if err != nil {
 			clientErr := err.(*httputils.JSONClientError)
 			failedList = append(failedList, clientErr.Details)
@@ -137,7 +137,7 @@ func (self *MachineChangeConfigTask) changeInstances(session *mcclient.ClientSes
 		succeedList = append(succeedList, SInstance{id, name})
 		return failedList, succeedList
 	}
-	rets := modules.Servers.BatchPerformAction(session, ids, "change-config", params)
+	rets := computemod.Servers.BatchPerformAction(session, ids, "change-config", params)
 	for _, ret := range rets {
 		if ret.Status >= 400 {
 			failedList = append(failedList, ret.Data.String())
@@ -166,7 +166,7 @@ func (self *MachineChangeConfigTask) checkAllServer(session *mcclient.ClientSess
 		select {
 		default:
 			for _, id := range guestIDSet.UnsortedList() {
-				ret, e := modules.Servers.GetSpecific(session, id, "status", nil)
+				ret, e := computemod.Servers.GetSpecific(session, id, "status", nil)
 				if e != nil {
 					log.Errorf("Servers.GetSpecific failed: %s", e)
 					<-ticker.C

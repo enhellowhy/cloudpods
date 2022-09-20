@@ -33,7 +33,7 @@ func init() {
 		[]string{},
 		[]string{},
 	)}
-	register(&BillBalances)
+	Register(&BillBalances)
 }
 
 func (this *BillBalanceManager) Get(session *mcclient.ClientSession, id string, params jsonutils.JSONObject) (jsonutils.JSONObject, error) {

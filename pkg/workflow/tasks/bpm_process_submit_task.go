@@ -14,6 +14,10 @@ import (
 	"yunion.io/x/onecloud/pkg/cloudcommon/db/taskman"
 	"yunion.io/x/onecloud/pkg/mcclient/auth"
 	"yunion.io/x/onecloud/pkg/mcclient/modules"
+	computemod "yunion.io/x/onecloud/pkg/mcclient/modules/compute"
+	"yunion.io/x/onecloud/pkg/mcclient/modules/identity"
+	imagemod "yunion.io/x/onecloud/pkg/mcclient/modules/image"
+	"yunion.io/x/onecloud/pkg/mcclient/modules/thirdparty"
 	"yunion.io/x/onecloud/pkg/util/logclient"
 	"yunion.io/x/onecloud/pkg/workflow/models"
 	"yunion.io/x/onecloud/pkg/workflow/options"
@@ -99,8 +103,8 @@ type DataResponse struct {
 
 func (self *BpmProcessSubmitTask) submitProcess(ctx context.Context, workflow *models.SWorkflowProcessInstance) (*submitProcessResponse, error) {
 
-	s := auth.GetAdminSession(ctx, options.Options.Region, "")
-	userV3, err := modules.UsersV3.Get(s, workflow.Initiator, nil)
+	s := auth.GetAdminSession(ctx, options.Options.Region)
+	userV3, err := identity.UsersV3.Get(s, workflow.Initiator, nil)
 	if err != nil {
 		self.taskFailed(ctx, workflow, "fail to get userv3 info")
 		return nil, err
@@ -119,7 +123,7 @@ func (self *BpmProcessSubmitTask) submitProcess(ctx context.Context, workflow *m
 		self.taskFailed(ctx, workflow, "userv3 staff id empty")
 		return nil, err
 	}
-	coaUser, err := modules.CoaUsers.Get(s, staffId, nil)
+	coaUser, err := thirdparty.CoaUsers.Get(s, staffId, nil)
 	if err != nil {
 		self.taskFailed(ctx, workflow, "fail to get coa user info")
 		return nil, err
@@ -178,7 +182,7 @@ func (self *BpmProcessSubmitTask) submitProcess(ctx context.Context, workflow *m
 	//var secretKey = "d71da5813650108c"
 	//bpmUrl := "https://bpm.lixiangoa.com/apps/api/v1/openapi/process"
 	//_, resp, err := httputils.JSONRequest(httpclient, ctx, httputils.POST, bpmUrl+"/submitProcess", header, body, true)
-	resp, err := modules.BpmProcess.SubmitProcess(s, body)
+	resp, err := thirdparty.BpmProcess.SubmitProcess(s, body)
 	if err != nil {
 		log.Errorf("BpmSubmitProcess: %v", err)
 		return nil, err
@@ -218,7 +222,7 @@ func (self *BpmProcessSubmitTask) getApplyDataSet(ctx context.Context, workflow 
 		return DataSet{}, err
 	}
 	pzgg = fmt.Sprintf("%s(通用型 %d核%dGB)", input.InstanceType, input.VcpuCount, input.VmemSize/1024)
-	s := auth.GetAdminSession(ctx, options.Options.Region, "")
+	s := auth.GetAdminSession(ctx, options.Options.Region)
 
 	for _, disk := range input.Disks {
 		//if i == len(input.Disks)-1 {
@@ -231,10 +235,10 @@ func (self *BpmProcessSubmitTask) getApplyDataSet(ctx context.Context, workflow 
 		case "sys":
 			prefix = diskTypeMap[disk.DiskType]
 			if disk.ImageId != "" {
-				image, _ := modules.Images.GetById(s, disk.ImageId, nil)
+				image, _ := imagemod.Images.GetById(s, disk.ImageId, nil)
 				os, _ = image.GetString("name")
 			} else if input.Cdrom != "" {
-				image, _ := modules.Images.GetById(s, input.Cdrom, nil)
+				image, _ := imagemod.Images.GetById(s, input.Cdrom, nil)
 				os, _ = image.GetString("name")
 			} else {
 				log.Errorf("No bootable disk information provided for %s", input.GenerateName)
@@ -322,8 +326,8 @@ func (self *BpmProcessSubmitTask) getChangeConfigDataSet(ctx context.Context, wo
 		log.Errorf("fail to unmarshal ServerChangeConfigInput %v", err)
 		return DataSet{}, err
 	}
-	s := auth.GetAdminSession(ctx, options.Options.Region, "")
-	skuJson, err := modules.ServerSkus.GetByName(s, input.InstanceType, nil)
+	s := auth.GetAdminSession(ctx, options.Options.Region)
+	skuJson, err := computemod.ServerSkus.GetByName(s, input.InstanceType, nil)
 	if err != nil {
 		log.Errorf("fail to get server sku %v", err)
 		return DataSet{}, err
@@ -344,7 +348,7 @@ func (self *BpmProcessSubmitTask) getChangeConfigDataSet(ctx context.Context, wo
 	ids := strings.Split(workflow.Ids, ",")
 	count = len(ids)
 	for _, id := range ids {
-		serverJson, err := modules.Servers.GetById(s, id, nil)
+		serverJson, err := computemod.Servers.GetById(s, id, nil)
 		if err != nil {
 			log.Errorf("unable to fetch server %v", err)
 			return DataSet{}, err
@@ -458,8 +462,8 @@ func (self *BpmProcessSubmitTask) getBucketApplyDataSet(ctx context.Context, wor
 
 	var userName string
 	if input.CloudproviderType == compute.CLOUD_PROVIDER_TYPE_SPECIFY {
-		s := auth.GetAdminSession(ctx, options.Options.Region, "")
-		providerJson, err := modules.Cloudproviders.GetById(s, input.CloudproviderId, nil)
+		s := auth.GetAdminSession(ctx, options.Options.Region)
+		providerJson, err := computemod.Cloudproviders.GetById(s, input.CloudproviderId, nil)
 		if err != nil {
 			log.Errorf("fail to get cloudprovider %v", err)
 			return DataSet{}, err
@@ -596,15 +600,15 @@ func (self *BpmProcessSubmitTask) getLoadbalancerApplyDataSet(ctx context.Contex
 		return DataSet{}, err
 	}
 
-	s := auth.GetAdminSession(ctx, options.Options.Region, "")
+	s := auth.GetAdminSession(ctx, options.Options.Region)
 
-	projectJson, _ := modules.Projects.GetById(s, input.ProjectId, nil)
+	projectJson, _ := identity.Projects.GetById(s, input.ProjectId, nil)
 	projectName, _ := projectJson.GetString("name")
 
-	networkJson, _ := modules.Networks.GetById(s, input.NetworkId, nil)
+	networkJson, _ := computemod.Networks.GetById(s, input.NetworkId, nil)
 	networkName, _ := networkJson.GetString("name")
 
-	clusterJson, _ := modules.LoadbalancerClusters.GetById(s, input.ClusterId, nil)
+	clusterJson, _ := computemod.LoadbalancerClusters.GetById(s, input.ClusterId, nil)
 	clusterName, _ := clusterJson.GetString("name")
 
 	dataSet := DataSet{

@@ -18,16 +18,16 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/coredns/coredns/plugin/pkg/log"
 	"strconv"
 	"time"
 	"yunion.io/x/jsonutils"
+	"yunion.io/x/log"
 	api "yunion.io/x/onecloud/pkg/apis/billing"
-	"yunion.io/x/onecloud/pkg/apis/compute"
+	computeapi "yunion.io/x/onecloud/pkg/apis/compute"
 	"yunion.io/x/onecloud/pkg/cloudcommon/db"
 	"yunion.io/x/onecloud/pkg/httperrors"
 	"yunion.io/x/onecloud/pkg/mcclient"
-	"yunion.io/x/onecloud/pkg/mcclient/modules"
+	"yunion.io/x/onecloud/pkg/mcclient/modules/compute"
 	"yunion.io/x/onecloud/pkg/util/rbacutils"
 	"yunion.io/x/onecloud/pkg/util/stringutils2"
 	"yunion.io/x/pkg/errors"
@@ -442,7 +442,7 @@ func (manager *SBillManager) GetExportExtraKeys(ctx context.Context, keys string
 	return res
 }
 
-func (m *SBillManager) VerifyExistingGuests(ctx context.Context, session *mcclient.ClientSession) *compute.ServerDetails {
+func (m *SBillManager) VerifyExistingGuests(ctx context.Context, session *mcclient.ClientSession) *computeapi.ServerDetails {
 	params := jsonutils.NewDict()
 	params.Set("limit", jsonutils.NewInt(0))
 	params.Set("scope", jsonutils.NewString("system"))
@@ -451,13 +451,13 @@ func (m *SBillManager) VerifyExistingGuests(ctx context.Context, session *mcclie
 	params.Set("hypervisor", jsonutils.NewString("kvm"))
 	//params.Set("get_all_guests_on_host", jsonutils.NewString(m.host.GetHostId()))
 	//params.Set("filter.0", jsonutils.NewString(fmt.Sprintf("id.in(%s)", strings.Join(keys, ","))))
-	res, err := modules.Servers.List(session, params)
+	res, err := compute.Servers.List(session, params)
 	if err != nil {
 		log.Warningf("test")
 	} else {
 		for _, v := range res.Data {
 			log.Infof(v.String())
-			serverDetail := new(compute.ServerDetails)
+			serverDetail := new(computeapi.ServerDetails)
 			err = res.Data[3].Unmarshal(serverDetail)
 			if err != nil {
 				log.Errorf("fail to unmarshal ServerDetails %v", err)

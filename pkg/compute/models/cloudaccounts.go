@@ -953,7 +953,7 @@ func (self *SCloudaccount) GetSubAccounts(ctx context.Context) ([]cloudprovider.
 }
 
 func (self *SCloudaccount) GetObjectStoreStats() (map[string]interface{}, error) {
-	provider, err := self.getProviderInternal()
+	provider, err := self.getProviderInternal(context.Background())
 	if err != nil {
 		return nil, err
 	}
@@ -961,7 +961,7 @@ func (self *SCloudaccount) GetObjectStoreStats() (map[string]interface{}, error)
 }
 
 func (self *SCloudaccount) CreateObjectStoreUser(name string) (int, error) {
-	provider, err := self.getProviderInternal()
+	provider, err := self.getProviderInternal(context.Background())
 	if err != nil {
 		return -1, err
 	}
@@ -973,7 +973,7 @@ func (self *SCloudaccount) CreateObjectStoreUser(name string) (int, error) {
 }
 
 func (self *SCloudaccount) GetSubAccountById(id int) (cloudprovider.SSubAccount, error) {
-	provider, err := self.getProviderInternal()
+	provider, err := self.getProviderInternal(context.Background())
 	if err != nil {
 		return cloudprovider.SSubAccount{}, err
 	}

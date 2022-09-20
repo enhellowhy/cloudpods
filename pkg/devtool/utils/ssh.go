@@ -403,7 +403,7 @@ func CheckTcp(session *mcclient.ClientSession, serverId string) error {
 		err = fmt.Errorf("unable to get ip for server %s", serverDetail.Id)
 		return err
 	}
-	port, err := getServerSshport(session, serverDetail.Id)
+	port, err := getServerSshport(session, serverDetail.Id, false)
 	if err != nil {
 		err = errors.Wrapf(err, "unable to get ssh port of server %s", serverDetail.Id)
 		return err

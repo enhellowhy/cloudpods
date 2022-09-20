@@ -24,7 +24,7 @@ import (
 	"yunion.io/x/log"
 	"yunion.io/x/onecloud/pkg/apis/compute"
 	"yunion.io/x/onecloud/pkg/mcclient/auth"
-	"yunion.io/x/onecloud/pkg/mcclient/modules"
+	computemod "yunion.io/x/onecloud/pkg/mcclient/modules/compute"
 	"yunion.io/x/pkg/errors"
 	"yunion.io/x/pkg/tristate"
 	"yunion.io/x/sqlchemy"
@@ -712,7 +712,7 @@ func (project *SProject) GetBucketUsages(ctx context.Context) ([]compute.SBucket
 	//if using this, token id is empty, but ctx token exists.
 	//s := GetDefaultClientSession(ctx, GetDefaultAdminCred(), options.Options.Region, "")
 	token := ctx.Value(auth.AUTH_TOKEN).(mcclient.TokenCredential)
-	s := GetDefaultClientSession(ctx, token, options.Options.Region, "")
+	s := GetDefaultClientSession(ctx, token, options.Options.Region)
 	//if using this, token manager is empty, nil pointer.
 	//s := auth.GetAdminSession(ctx, options.Options.Region, "")
 
@@ -724,7 +724,7 @@ func (project *SProject) GetBucketUsages(ctx context.Context) ([]compute.SBucket
 	params.Set("projects", jsonutils.NewString(project.Id))
 	for {
 		params.Set("offset", jsonutils.NewInt(offset))
-		result, err := modules.Buckets.List(s, params)
+		result, err := computemod.Buckets.List(s, params)
 		if err != nil {
 			return nil, errors.Wrap(err, "modules.Buckets.List")
 		}

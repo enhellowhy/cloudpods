@@ -22,6 +22,8 @@ import (
 	"yunion.io/x/onecloud/pkg/compute/options"
 	"yunion.io/x/onecloud/pkg/mcclient/auth"
 	"yunion.io/x/onecloud/pkg/mcclient/modules"
+	"yunion.io/x/onecloud/pkg/mcclient/modules/identity"
+	"yunion.io/x/onecloud/pkg/mcclient/modules/thirdparty"
 	"yunion.io/x/pkg/gotypes"
 
 	"yunion.io/x/jsonutils"
@@ -1513,15 +1515,15 @@ func (self *SLoadbalancer) NotifyInitiatorFeishuLoadbalancerEvent(ctx context.Co
 	kwargs.Add(jsonutils.NewString(content), "content")
 	kwargs.Add(jsonutils.NewInt(2), "platform")
 
-	s := auth.GetAdminSession(ctx, options.Options.Region, "")
+	s := auth.GetAdminSession(ctx, options.Options.Region)
 	var user jsonutils.JSONObject
 	//get user id
-	meta, _ := self.GetAllMetadata(nil)
+	meta, _ := self.GetAllMetadata(ctx, userCred)
 	userId := meta["user_id"]
 	if len(userId) > 0 {
-		user, _ = modules.UsersV3.Get(s, userId, nil)
+		user, _ = identity.UsersV3.Get(s, userId, nil)
 	} else {
-		user, _ = modules.UsersV3.Get(s, userCred.GetUserId(), nil)
+		user, _ = identity.UsersV3.Get(s, userCred.GetUserId(), nil)
 	}
 	if user == nil {
 		log.Errorln("NotifyInitiatorFeishuLoadbalancerEvent user is empty.")
@@ -1540,7 +1542,7 @@ func (self *SLoadbalancer) NotifyInitiatorFeishuLoadbalancerEvent(ctx context.Co
 			log.Errorln("NotifyInitiatorFeishuLoadbalancerEvent user staff_id is empty.")
 			return
 		} else {
-			coaUser, _ := modules.CoaUsers.Get(s, staffId, nil)
+			coaUser, _ := thirdparty.CoaUsers.Get(s, staffId, nil)
 			if gotypes.IsNil(coaUser) {
 				log.Errorln("NotifyInitiatorFeishuLoadbalancerEvent coa user is empty.")
 				return
@@ -1555,7 +1557,7 @@ func (self *SLoadbalancer) NotifyInitiatorFeishuLoadbalancerEvent(ctx context.Co
 	}
 
 	kwargs.Add(jsonutils.NewString(feishuUserId), "feishu_user_id")
-	_, err := modules.CoaUsers.SendMarkdownMessage(s, kwargs)
+	_, err := thirdparty.CoaUsers.SendMarkdownMessage(s, kwargs)
 	if err != nil {
 		log.Errorf("NotifyInitiatorFeishuLoadbalancerEvent send message error %v.", err)
 	}

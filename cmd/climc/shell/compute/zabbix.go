@@ -17,7 +17,7 @@ package compute
 import (
 	"yunion.io/x/jsonutils"
 	"yunion.io/x/onecloud/pkg/mcclient"
-	"yunion.io/x/onecloud/pkg/mcclient/modules"
+	"yunion.io/x/onecloud/pkg/mcclient/modules/thirdparty"
 )
 
 func init() {
@@ -25,7 +25,7 @@ func init() {
 		Auth string `json:"-"`
 	}
 	R(&ZabbixAuthOptions{}, "zabbix-user-login", "Zabbix user login", func(s *mcclient.ClientSession, arg *ZabbixAuthOptions) error {
-		result, err := modules.Zabbix.UserLogin(s)
+		result, err := thirdparty.Zabbix.UserLogin(s)
 		if err != nil {
 			return err
 		}
@@ -35,7 +35,7 @@ func init() {
 		return nil
 	})
 	R(&ZabbixAuthOptions{}, "zabbix-user-logout", "Zabbix user logout", func(s *mcclient.ClientSession, arg *ZabbixAuthOptions) error {
-		result, err := modules.Zabbix.UserLogout(s, arg.Auth)
+		result, err := thirdparty.Zabbix.UserLogout(s, arg.Auth)
 		if err != nil {
 			return err
 		}
@@ -48,7 +48,7 @@ func init() {
 		Ip       string `json:"-"`
 	}
 	R(&ZabbixHostGetOptions{}, "zabbix-host-get", "Zabbix host get", func(s *mcclient.ClientSession, opts *ZabbixHostGetOptions) error {
-		result, err := modules.Zabbix.HostGet(s, opts.Auth, opts.HostName, opts.Ip)
+		result, err := thirdparty.Zabbix.HostGet(s, opts.Auth, opts.HostName, opts.Ip)
 		if err != nil {
 			return err
 		}
@@ -62,7 +62,7 @@ func init() {
 		Id   string `json:"-"`
 	}
 	R(&ZabbixHostIdOptions{}, "zabbix-host-disable", "Zabbix host disable", func(s *mcclient.ClientSession, opts *ZabbixHostIdOptions) error {
-		result, err := modules.Zabbix.HostDisable(s, opts.Auth, opts.Id)
+		result, err := thirdparty.Zabbix.HostDisable(s, opts.Auth, opts.Id)
 		if err != nil {
 			return err
 		}
@@ -70,7 +70,7 @@ func init() {
 		return nil
 	})
 	R(&ZabbixHostIdOptions{}, "zabbix-host-enable", "Zabbix host enable", func(s *mcclient.ClientSession, opts *ZabbixHostIdOptions) error {
-		result, err := modules.Zabbix.HostEnable(s, opts.Auth, opts.Id)
+		result, err := thirdparty.Zabbix.HostEnable(s, opts.Auth, opts.Id)
 		if err != nil {
 			return err
 		}
@@ -78,7 +78,7 @@ func init() {
 		return nil
 	})
 	R(&ZabbixHostIdOptions{}, "zabbix-host-delete", "Zabbix host delete", func(s *mcclient.ClientSession, opts *ZabbixHostIdOptions) error {
-		result, err := modules.Zabbix.HostDelete(s, opts.Auth, opts.Id)
+		result, err := thirdparty.Zabbix.HostDelete(s, opts.Auth, opts.Id)
 		if err != nil {
 			return err
 		}

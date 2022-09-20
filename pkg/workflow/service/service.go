@@ -19,9 +19,8 @@ import (
 	"github.com/getsentry/sentry-go"
 	"os"
 
-	_ "github.com/go-sql-driver/mysql"
-
 	"yunion.io/x/log"
+	_ "yunion.io/x/sqlchemy/backends"
 
 	"yunion.io/x/onecloud/pkg/apis"
 	"yunion.io/x/onecloud/pkg/cloudcommon"
@@ -50,9 +49,11 @@ func StartService() {
 	})
 
 	app := app_common.InitApp(baseOpts, true)
+
+	cloudcommon.InitDB(dbOpts)
 	initHandlers(app)
 
-	db.EnsureAppInitSyncDB(app, dbOpts, models.InitDB)
+	db.EnsureAppSyncDB(app, dbOpts, models.InitDB)
 	defer cloudcommon.CloseDB()
 
 	//models.StartNotifyToWebsocketWorker()

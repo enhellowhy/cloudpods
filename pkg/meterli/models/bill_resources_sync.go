@@ -20,7 +20,8 @@ import (
 	"strconv"
 	"strings"
 	api "yunion.io/x/onecloud/pkg/apis/billing"
-	"yunion.io/x/onecloud/pkg/apis/compute"
+	computeapi "yunion.io/x/onecloud/pkg/apis/compute"
+	"yunion.io/x/onecloud/pkg/mcclient/modules/identity"
 
 	"yunion.io/x/jsonutils"
 	"yunion.io/x/log"
@@ -31,7 +32,7 @@ import (
 	"yunion.io/x/onecloud/pkg/mcclient"
 	"yunion.io/x/onecloud/pkg/mcclient/auth"
 	"yunion.io/x/onecloud/pkg/mcclient/modulebase"
-	mc_mds "yunion.io/x/onecloud/pkg/mcclient/modules"
+	"yunion.io/x/onecloud/pkg/mcclient/modules/compute"
 )
 
 var (
@@ -80,7 +81,7 @@ func newSyncObj(sync IResourceSync) SyncObject {
 
 func (manager *SBillResourceManager) SyncResources(ctx context.Context, userCred mcclient.TokenCredential, isStart bool) {
 	log.Infoln("start sync resources")
-	session := auth.GetAdminSession(ctx, "", "")
+	session := auth.GetAdminSession(ctx, "")
 	// sync servers
 	manager.SyncServers(ctx, session)
 	// sync baremetals
@@ -146,7 +147,7 @@ Loop:
 	return errors.NewAggregate(errs)
 }
 
-func (manager *SBillResourceManager) newBillResourceCreateInputByServer(server *compute.ServerDetails) *api.BillResourceCreateInput {
+func (manager *SBillResourceManager) newBillResourceCreateInputByServer(server *computeapi.ServerDetails) *api.BillResourceCreateInput {
 	input := new(api.BillResourceCreateInput)
 	input.ResourceType = RES_TYPE_SERVER
 	input.ResourceId = server.Id
@@ -234,7 +235,7 @@ Loop:
 	return errors.NewAggregate(errs)
 }
 
-func (manager *SBillResourceManager) newBillResourceCreateInputByBaremetal(session *mcclient.ClientSession, server *compute.ServerDetails) *api.BillResourceCreateInput {
+func (manager *SBillResourceManager) newBillResourceCreateInputByBaremetal(session *mcclient.ClientSession, server *computeapi.ServerDetails) *api.BillResourceCreateInput {
 	input := new(api.BillResourceCreateInput)
 	input.ResourceType = RES_TYPE_BAREMETAL
 	input.ResourceId = server.Id
@@ -250,12 +251,12 @@ func (manager *SBillResourceManager) newBillResourceCreateInputByBaremetal(sessi
 	input.Mem = server.VmemSize / 1024
 
 	// get model
-	hostJson, err := mc_mds.Hosts.GetById(session, server.HostId, nil)
+	hostJson, err := compute.Hosts.GetById(session, server.HostId, nil)
 	if err != nil {
 		log.Errorf("get baremetal host %s err %v", server.Host, err)
 		return nil
 	}
-	hostDetail := new(compute.HostDetails)
+	hostDetail := new(computeapi.HostDetails)
 	err = hostJson.Unmarshal(hostDetail)
 	if err != nil {
 		log.Errorf("fail to unmarshal %s HostDetails %v", server.Host, err)
@@ -333,7 +334,7 @@ Loop:
 	return errors.NewAggregate(errs)
 }
 
-func (manager *SBillResourceManager) newBillResourceCreateInputByDisk(disk *compute.DiskDetails) *api.BillResourceCreateInput {
+func (manager *SBillResourceManager) newBillResourceCreateInputByDisk(disk *computeapi.DiskDetails) *api.BillResourceCreateInput {
 	input := new(api.BillResourceCreateInput)
 	input.ResourceType = RES_TYPE_DISK
 	input.ResourceId = disk.Id
@@ -366,33 +367,33 @@ func GetOnecloudResources(resTyep string) ([]jsonutils.JSONObject, error) {
 	switch resTyep {
 	case monitor.METRIC_RES_TYPE_HOST:
 		//query.Set("host-type", jsonutils.NewString(hostconsts.TELEGRAF_TAG_KEY_HYPERVISOR))
-		allResources, err = ListAllResources(&mc_mds.Hosts, query)
+		allResources, err = ListAllResources(&compute.Hosts, query)
 	case monitor.METRIC_RES_TYPE_GUEST:
-		allResources, err = ListAllResources(&mc_mds.Servers, query)
+		allResources, err = ListAllResources(&compute.Servers, query)
 	case monitor.METRIC_RES_TYPE_AGENT:
-		allResources, err = ListAllResources(&mc_mds.Servers, query)
+		allResources, err = ListAllResources(&compute.Servers, query)
 	case monitor.METRIC_RES_TYPE_RDS:
-		allResources, err = ListAllResources(&mc_mds.DBInstance, query)
+		allResources, err = ListAllResources(&compute.DBInstance, query)
 	case monitor.METRIC_RES_TYPE_REDIS:
-		allResources, err = ListAllResources(&mc_mds.ElasticCache, query)
+		allResources, err = ListAllResources(&compute.ElasticCache, query)
 	case monitor.METRIC_RES_TYPE_OSS:
-		allResources, err = ListAllResources(&mc_mds.Buckets, query)
+		allResources, err = ListAllResources(&compute.Buckets, query)
 	case monitor.METRIC_RES_TYPE_CLOUDACCOUNT:
 		query.Remove("status")
 		query.Add(jsonutils.NewBool(true), "enabled")
-		allResources, err = ListAllResources(&mc_mds.Cloudaccounts, query)
+		allResources, err = ListAllResources(&compute.Cloudaccounts, query)
 	case monitor.METRIC_RES_TYPE_TENANT:
-		allResources, err = ListAllResources(&mc_mds.Projects, query)
+		allResources, err = ListAllResources(&identity.Projects, query)
 	case monitor.METRIC_RES_TYPE_DOMAIN:
-		allResources, err = ListAllResources(&mc_mds.Domains, query)
+		allResources, err = ListAllResources(&identity.Domains, query)
 	case monitor.METRIC_RES_TYPE_STORAGE:
 		query.Remove("status")
-		allResources, err = ListAllResources(&mc_mds.Storages, query)
+		allResources, err = ListAllResources(&compute.Storages, query)
 	default:
 		query := jsonutils.NewDict()
 		query.Set("brand", jsonutils.NewString(hostconsts.TELEGRAF_TAG_ONECLOUD_BRAND))
 		query.Set("host-type", jsonutils.NewString(hostconsts.TELEGRAF_TAG_KEY_HYPERVISOR))
-		allResources, err = ListAllResources(&mc_mds.Hosts, query)
+		allResources, err = ListAllResources(&compute.Hosts, query)
 	}
 
 	if err != nil {
@@ -409,7 +410,7 @@ func ListAllResources(manager modulebase.Manager, params *jsonutils.JSONDict) ([
 	params.Add(jsonutils.NewInt(0), "limit")
 	params.Add(jsonutils.NewBool(true), "details")
 	var count int
-	session := auth.GetAdminSession(context.Background(), "", "")
+	session := auth.GetAdminSession(context.Background(), "")
 	objs := make([]jsonutils.JSONObject, 0)
 	for {
 		params.Set("offset", jsonutils.NewInt(int64(count)))
@@ -429,8 +430,8 @@ func ListAllResources(manager modulebase.Manager, params *jsonutils.JSONDict) ([
 	return objs, nil
 }
 
-func ListGuests(ctx context.Context, session *mcclient.ClientSession) ([]*compute.ServerDetails, error) {
-	guestList := make([]*compute.ServerDetails, 0)
+func ListGuests(ctx context.Context, session *mcclient.ClientSession) ([]*computeapi.ServerDetails, error) {
+	guestList := make([]*computeapi.ServerDetails, 0)
 	params := jsonutils.NewDict()
 	params.Set("limit", jsonutils.NewInt(0))
 	params.Set("scope", jsonutils.NewString("system"))
@@ -439,14 +440,14 @@ func ListGuests(ctx context.Context, session *mcclient.ClientSession) ([]*comput
 	params.Set("hypervisor", jsonutils.NewString("kvm"))
 	//params.Set("get_all_guests_on_host", jsonutils.NewString(m.host.GetHostId()))
 	//params.Set("filter.0", jsonutils.NewString(fmt.Sprintf("id.in(%s)", strings.Join(keys, ","))))
-	res, err := mc_mds.Servers.List(session, params)
+	res, err := compute.Servers.List(session, params)
 	if err != nil {
 		log.Errorf("get server list err %v", err)
 		return nil, err
 	} else {
 		for i := range res.Data {
 			//log.Infof(v.String())
-			serverDetail := new(compute.ServerDetails)
+			serverDetail := new(computeapi.ServerDetails)
 			err = res.Data[i].Unmarshal(serverDetail)
 			if err != nil {
 				log.Errorf("fail to unmarshal ServerDetails %v", err)
@@ -461,22 +462,22 @@ func ListGuests(ctx context.Context, session *mcclient.ClientSession) ([]*comput
 	return guestList, nil
 }
 
-func ListBaremetals(ctx context.Context, session *mcclient.ClientSession) ([]*compute.ServerDetails, error) {
-	guestList := make([]*compute.ServerDetails, 0)
+func ListBaremetals(ctx context.Context, session *mcclient.ClientSession) ([]*computeapi.ServerDetails, error) {
+	guestList := make([]*computeapi.ServerDetails, 0)
 	params := jsonutils.NewDict()
 	params.Set("limit", jsonutils.NewInt(0))
 	params.Set("scope", jsonutils.NewString("system"))
 	params.Set("system", jsonutils.JSONTrue)
 	params.Set("pending_delete", jsonutils.NewBool(false))
 	params.Set("hypervisor", jsonutils.NewString("baremetal"))
-	res, err := mc_mds.Servers.List(session, params)
+	res, err := compute.Servers.List(session, params)
 	if err != nil {
 		log.Errorf("get baremetal list err %v", err)
 		return nil, err
 	} else {
 		for i := range res.Data {
 			//log.Infof(v.String())
-			serverDetail := new(compute.ServerDetails)
+			serverDetail := new(computeapi.ServerDetails)
 			err = res.Data[i].Unmarshal(serverDetail)
 			if err != nil {
 				log.Errorf("fail to unmarshal baremetal ServerDetails %v", err)
@@ -491,27 +492,27 @@ func ListBaremetals(ctx context.Context, session *mcclient.ClientSession) ([]*co
 	return guestList, nil
 }
 
-func ListDisks(ctx context.Context, session *mcclient.ClientSession) ([]*compute.DiskDetails, error) {
-	diskList := make([]*compute.DiskDetails, 0)
+func ListDisks(ctx context.Context, session *mcclient.ClientSession) ([]*computeapi.DiskDetails, error) {
+	diskList := make([]*computeapi.DiskDetails, 0)
 	params := jsonutils.NewDict()
 	params.Set("limit", jsonutils.NewInt(0))
 	params.Set("scope", jsonutils.NewString("system"))
 	params.Set("system", jsonutils.JSONTrue)
 	params.Set("pending_delete", jsonutils.NewBool(false))
-	res, err := mc_mds.Disks.List(session, params)
+	res, err := compute.Disks.List(session, params)
 	if err != nil {
 		log.Errorf("get disk list err %v", err)
 		return nil, err
 	} else {
 		for i := range res.Data {
 			//log.Infof(v.String())
-			diskDetail := new(compute.DiskDetails)
+			diskDetail := new(computeapi.DiskDetails)
 			err = res.Data[i].Unmarshal(diskDetail)
 			if err != nil {
 				log.Errorf("fail to unmarshal diskDetails %v", err)
 				continue
 			}
-			if diskDetail.StorageType == compute.STORAGE_BAREMETAL {
+			if diskDetail.StorageType == computeapi.STORAGE_BAREMETAL {
 				continue
 			}
 			diskList = append(diskList, diskDetail)

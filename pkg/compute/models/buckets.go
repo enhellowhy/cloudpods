@@ -23,6 +23,8 @@ import (
 	"strings"
 	"time"
 	"yunion.io/x/onecloud/pkg/mcclient/modules"
+	"yunion.io/x/onecloud/pkg/mcclient/modules/identity"
+	"yunion.io/x/onecloud/pkg/mcclient/modules/thirdparty"
 	osprovider "yunion.io/x/onecloud/pkg/multicloud/objectstore/provider"
 	"yunion.io/x/onecloud/pkg/multicloud/objectstore/xsky"
 	"yunion.io/x/pkg/gotypes"
@@ -1360,7 +1362,7 @@ func (bucket *SBucket) PerformSyncUsages(
 		return nil, httperrors.NewInvalidStatusError("no external bucket")
 	}
 
-	provider, err := bucket.GetDriver()
+	provider, err := bucket.GetDriver(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "GetDriver")
 	}
@@ -1388,7 +1390,7 @@ func (bucket *SBucket) PerformMonitor(
 	from, _ := data.GetString("from")
 	interval, _ := data.GetString("interval")
 
-	provider, err := bucket.GetDriver()
+	provider, err := bucket.GetDriver(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "GetDriver")
 	}
@@ -2186,7 +2188,7 @@ func (self *SBucket) NotifyInitiatorFeishuBucketEvent(ctx context.Context, userC
 	//	log.Errorf("NotifyInitiatorFeishuBucketEvent get provider sk error %v.", err)
 	//	return
 	//}
-	iregion, err := self.GetIRegion()
+	iregion, err := self.GetIRegion(ctx)
 	if err != nil {
 		log.Errorf("NotifyInitiatorFeishuBucketEvent get bucket.GetIRegion error %v.", err)
 		return
@@ -2207,15 +2209,15 @@ func (self *SBucket) NotifyInitiatorFeishuBucketEvent(ctx context.Context, userC
 	kwargs.Add(jsonutils.NewString(content), "content")
 	kwargs.Add(jsonutils.NewInt(2), "platform")
 
-	s := auth.GetAdminSession(ctx, options.Options.Region, "")
+	s := auth.GetAdminSession(ctx, options.Options.Region)
 	var user jsonutils.JSONObject
 	//get user id
-	meta, _ := self.GetAllMetadata(nil)
+	meta, _ := self.GetAllMetadata(ctx, userCred)
 	userId := meta["user_id"]
 	if len(userId) > 0 {
-		user, _ = modules.UsersV3.Get(s, userId, nil)
+		user, _ = identity.UsersV3.Get(s, userId, nil)
 	} else {
-		user, _ = modules.UsersV3.Get(s, userCred.GetUserId(), nil)
+		user, _ = identity.UsersV3.Get(s, userCred.GetUserId(), nil)
 	}
 	if user == nil {
 		log.Errorln("NotifyInitiatorFeishuBucketEvent user is empty.")
@@ -2234,7 +2236,7 @@ func (self *SBucket) NotifyInitiatorFeishuBucketEvent(ctx context.Context, userC
 			log.Errorln("NotifyInitiatorFeishuBucketEvent user staff_id is empty.")
 			return
 		} else {
-			coaUser, _ := modules.CoaUsers.Get(s, staffId, nil)
+			coaUser, _ := thirdparty.CoaUsers.Get(s, staffId, nil)
 			if gotypes.IsNil(coaUser) {
 				log.Errorln("NotifyInitiatorFeishuBucketEvent coa user is empty.")
 				return
@@ -2249,7 +2251,7 @@ func (self *SBucket) NotifyInitiatorFeishuBucketEvent(ctx context.Context, userC
 	}
 
 	kwargs.Add(jsonutils.NewString(feishuUserId), "feishu_user_id")
-	_, err = modules.CoaUsers.SendMarkdownMessage(s, kwargs)
+	_, err = thirdparty.CoaUsers.SendMarkdownMessage(s, kwargs)
 	if err != nil {
 		log.Errorf("NotifyInitiatorFeishuBucketEvent send message error %v.", err)
 	}

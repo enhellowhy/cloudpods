@@ -31,5 +31,5 @@ func init() {
 		//[]string{"id", "name", "key", "enabled", "extra_id"},
 		[]string{},
 	)
-	register(&WorkflowProcessInstances)
+	Register(&WorkflowProcessInstances)
 }

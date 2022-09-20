@@ -26,12 +26,12 @@ import (
 	"time"
 	"yunion.io/x/jsonutils"
 	"yunion.io/x/log"
+	"yunion.io/x/onecloud/pkg/mcclient/modules/compute"
 	"yunion.io/x/pkg/errors"
 	"yunion.io/x/pkg/tristate"
 	"yunion.io/x/pkg/util/sets"
 	"yunion.io/x/sqlchemy"
 
-	"yunion.io/x/onecloud/pkg/apis/compute"
 	computeapi "yunion.io/x/onecloud/pkg/apis/compute"
 	"yunion.io/x/onecloud/pkg/cloudcommon/cronman"
 	"yunion.io/x/onecloud/pkg/cloudcommon/db"
@@ -39,7 +39,7 @@ import (
 	"yunion.io/x/onecloud/pkg/mcclient"
 	"yunion.io/x/onecloud/pkg/mcclient/auth"
 	"yunion.io/x/onecloud/pkg/mcclient/modules"
-	mcoptions "yunion.io/x/onecloud/pkg/mcclient/options"
+	mcoptions "yunion.io/x/onecloud/pkg/mcclient/options/compute"
 	"yunion.io/x/onecloud/pkg/util/logclient"
 	"yunion.io/x/onecloud/pkg/util/nopanic"
 )
@@ -117,7 +117,7 @@ func (bc *SBalancerController) Init(checkBalanceInterval int, cronm *cronman.SCr
 	nopanic.Run(func() {
 		log.Infof("check and update cluster activities...")
 		cas := make([]models.SClusterActivity, 0, 10)
-		q := models.ClusterActivityManager.Query().Equals("status", compute.SA_STATUS_EXEC)
+		q := models.ClusterActivityManager.Query().Equals("status", computeapi.SA_STATUS_EXEC)
 		err := db.FetchModelObjects(models.ClusterActivityManager, q, &cas)
 		if err != nil {
 			log.Errorf("unable to check and update cluster activities")
@@ -265,7 +265,7 @@ func (bc *SBalancerController) Balance(ctx context.Context, userCred mcclient.To
 		cluster.Id,
 		"",
 		STRATEGY_ASSIGNED,
-		compute.SA_STATUS_EXEC,
+		computeapi.SA_STATUS_EXEC,
 	)
 	if err != nil {
 		return
@@ -286,7 +286,7 @@ func (bc *SBalancerController) Balance(ctx context.Context, userCred mcclient.To
 		}
 		action.Truncate(action.Len() - 2)
 		action.WriteString(" are migrated")
-		err = clusterActivity.SetResult(action.String(), compute.SA_STATUS_SUCCEED, "", num)
+		err = clusterActivity.SetResult(action.String(), computeapi.SA_STATUS_SUCCEED, "", num)
 	default:
 		var action bytes.Buffer
 		action.WriteString("Instances ")
@@ -295,7 +295,7 @@ func (bc *SBalancerController) Balance(ctx context.Context, userCred mcclient.To
 		}
 		action.Truncate(action.Len() - 2)
 		action.WriteString(" are migrated")
-		err = clusterActivity.SetResult(action.String(), compute.SA_STATUS_PART_SUCCEED, fmt.Sprintf("Some instances migrate failed: %s", err.Error()), len(succeedInstances))
+		err = clusterActivity.SetResult(action.String(), computeapi.SA_STATUS_PART_SUCCEED, fmt.Sprintf("Some instances migrate failed: %s", err.Error()), len(succeedInstances))
 	}
 	return
 }
@@ -329,7 +329,7 @@ func (bc *SBalancerController) doMigrate(ctx context.Context, session *mcclient.
 		//if err != nil {
 		//	return nil, errors.Wrapf(err, "live migrate input %#v", input)
 		//}
-		obj, err := modules.Servers.PerformAction(session, input.GetId(), "live-migrate", params)
+		obj, err := compute.Servers.PerformAction(session, input.GetId(), "live-migrate", params)
 		if err != nil {
 			//迁移记录
 			noteStr := fmt.Sprintf("guest %s live migrate err: %s", guest.GetName(), err.Error())
@@ -353,7 +353,7 @@ func (s sortableGuest) Less(i, j int) bool {
 }
 
 func (bc *SBalancerController) drsRecords(session *mcclient.ClientSession, activity *models.SClusterActivity, guest *memCandidate, sourceHost *memHost, targetHost *models.SHost, startTime time.Time, noteStr, strategy string, success bool) {
-	params := &compute.DrsRecordCreateInput{}
+	params := &computeapi.DrsRecordCreateInput{}
 	params.StartTime = startTime
 	params.ClusterId = activity.ClusterId
 	//
@@ -369,7 +369,7 @@ func (bc *SBalancerController) drsRecords(session *mcclient.ClientSession, activ
 	params.Strategy = strategy
 	params.Success = success
 
-	_, err := modules.DrsRecords.Create(session, jsonutils.Marshal(params))
+	_, err := compute.DrsRecords.Create(session, jsonutils.Marshal(params))
 	if err != nil {
 		log.Errorf("DrsRecordManager.Create err: %v", err)
 	}
@@ -437,9 +437,9 @@ func (asc *SBalancerController) findSuitableInstance(sg *models.SScalingGroup, n
 	ggSubQ := models.ScalingGroupGuestManager.Query("guest_id").Equals("scaling_group_id", sg.Id).SubQuery()
 	guestQ := models.GuestManager.Query().In("id", ggSubQ)
 	switch sg.ShrinkPrinciple {
-	case compute.SHRINK_EARLIEST_CREATION_FIRST:
+	case computeapi.SHRINK_EARLIEST_CREATION_FIRST:
 		guestQ = guestQ.Asc("created_at").Limit(num)
-	case compute.SHRINK_LATEST_CREATION_FIRST:
+	case computeapi.SHRINK_LATEST_CREATION_FIRST:
 		guestQ = guestQ.Desc("created_at").Limit(num)
 	}
 	guests := make([]models.SGuest, 0, num)
@@ -465,7 +465,7 @@ func (asc *SBalancerController) MigrateInstances(
 	activity *models.SClusterActivity,
 ) ([]SInstance, error) {
 	rand.Seed(time.Now().UnixNano())
-	session := auth.GetSession(ctx, userCred, "", "")
+	session := auth.GetSession(ctx, userCred, "")
 
 	// fisrt stage: migrate request
 	targetHostId := targetHost.GetId()
@@ -510,7 +510,7 @@ func (asc *SBalancerController) MigrateInstances(
 			log.Errorf("The ret id is %s not in candidates, not impossible!!", ret.Id)
 			continue
 		}
-		if ret.Status == compute.VM_RUNNING || ret.Status == compute.VM_READY {
+		if ret.Status == computeapi.VM_RUNNING || ret.Status == computeapi.VM_READY {
 			if ret.CurrentHostId != sourceHost.GetId() {
 				if ret.CurrentHostId == targetHostId {
 					asc.drsRecords(session, activity, guest, sourceHost, targetHost, startTime, "success", strategy, true)
@@ -535,9 +535,9 @@ func (asc *SBalancerController) MigrateInstances(
 			failRecord.Append(noteStr)
 		}
 		if strings.HasSuffix(ret.Status, "_fail") || strings.HasSuffix(ret.Status, "_failed") {
-			if ret.Status == compute.VM_MIGRATE_FAILED {
+			if ret.Status == computeapi.VM_MIGRATE_FAILED {
 				// try sync status to orignal
-				if _, err := modules.Servers.PerformAction(session, ret.Id, "syncstatus", nil); err != nil {
+				if _, err := compute.Servers.PerformAction(session, ret.Id, "syncstatus", nil); err != nil {
 					log.Errorf("Sync server %s migrate_failed status error: %v", ret.Id, err)
 				}
 			}
@@ -591,7 +591,7 @@ func (asc *SBalancerController) checkAllServer(session *mcclient.ClientSession, 
 		default:
 			for _, id := range guestIDSet.UnsortedList() {
 				//ret, e := modules.Servers.GetSpecific(session, id, "status", nil)
-				ret, e := modules.Servers.GetById(session, id, nil)
+				ret, e := compute.Servers.GetById(session, id, nil)
 				if e != nil {
 					log.Errorf("Servers GetDetails failed: %s", e)
 					<-ticker.C
@@ -600,7 +600,7 @@ func (asc *SBalancerController) checkAllServer(session *mcclient.ClientSession, 
 				log.Debugf("ret from Get: %s", ret.String())
 				status, _ := ret.GetString("status")
 				curHostId, _ := ret.GetString("host_id")
-				if status == compute.VM_RUNNING || status == compute.VM_READY || strings.HasSuffix(status, "fail") || strings.HasSuffix(status, "failed") {
+				if status == computeapi.VM_RUNNING || status == computeapi.VM_READY || strings.HasSuffix(status, "fail") || strings.HasSuffix(status, "failed") {
 					guestIDSet.Delete(id)
 					retChan <- SMigrateRet{
 						Id:            id,
@@ -665,24 +665,24 @@ func (asc *SBalancerController) actionAfterCreate(
 			return
 		}
 		// cancel delete project
-		_, e := modules.Servers.Update(session, ret.Id, updateParams)
+		_, e := compute.Servers.Update(session, ret.Id, updateParams)
 		if err != nil {
-			sggs[0].SetGuestStatus(compute.SG_GUEST_STATUS_READY)
+			sggs[0].SetGuestStatus(computeapi.SG_GUEST_STATUS_READY)
 			log.Errorf("cancel delete project of instance '%s' failed: %s", ret.Id, e.Error())
 			return
 		}
 		// delete corresponding instance
-		_, e = modules.Servers.Delete(session, ret.Id, deleteParams)
+		_, e = compute.Servers.Delete(session, ret.Id, deleteParams)
 		if e != nil {
 			// delete failed
-			sggs[0].SetGuestStatus(compute.SG_GUEST_STATUS_READY)
+			sggs[0].SetGuestStatus(computeapi.SG_GUEST_STATUS_READY)
 			log.Errorf("delete instance '%s' failed: %s", ret.Id, e.Error())
 			return
 		}
 		sggs[0].Detach(ctx, userCred)
 		return
 	}
-	if ret.Status != compute.VM_RUNNING {
+	if ret.Status != computeapi.VM_RUNNING {
 		if ret.Status == "timeout" {
 			rollback(fmt.Sprintf("the creation process for instance '%s' has timed out", ret.Id))
 		} else {
@@ -719,7 +719,7 @@ func (asc *SBalancerController) actionAfterCreate(
 		params.Set("port", jsonutils.NewInt(int64(sg.LoadbalancerBackendPort)))
 		params.Set("weight", jsonutils.NewInt(int64(sg.LoadbalancerBackendWeight)))
 		params.Set("backend_group", jsonutils.NewString(sg.BackendGroupId))
-		_, err := modules.LoadbalancerBackends.Create(session, params)
+		_, err := compute.LoadbalancerBackends.Create(session, params)
 		if err != nil {
 			rollback(fmt.Sprintf("bind instance '%s' to loadbalancer backend gropu '%s' failed: %s", ret.Id, sg.BackendGroupId, err.Error()))
 		}
@@ -732,7 +732,7 @@ func (asc *SBalancerController) actionAfterCreate(
 		log.Errorf("ScalingGroupGuestManager.Fetch failed; ScalingGroup '%s', Guest '%s'", sg.Id, ret.Id)
 		return
 	}
-	sggs[0].SetGuestStatus(compute.SG_GUEST_STATUS_READY)
+	sggs[0].SetGuestStatus(computeapi.SG_GUEST_STATUS_READY)
 	return true
 }
 
@@ -794,7 +794,7 @@ func (asc *SBalancerController) AssignedClustersNeedBalance() ([]SClusterShort, 
 	defer rows.Close()
 	clusters := make([]SClusterShort, 0, 10)
 	for rows.Next() {
-		cluster := compute.SCluster{}
+		cluster := computeapi.SCluster{}
 		err := asc.assignedSql.Row2Struct(rows, &cluster)
 		if err != nil {
 			return nil, errors.Wrap(err, "sqlchemy.SQuery.Row2Struct error")

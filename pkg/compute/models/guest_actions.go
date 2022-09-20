@@ -29,6 +29,7 @@ import (
 	"yunion.io/x/onecloud/pkg/mcclient/modules/devtool"
 	"yunion.io/x/onecloud/pkg/mcclient/modules/identity"
 	"yunion.io/x/onecloud/pkg/mcclient/modules/scheduler"
+	"yunion.io/x/onecloud/pkg/mcclient/modules/thirdparty"
 	jsoptions "yunion.io/x/onecloud/pkg/mcclient/options"
 	"yunion.io/x/pkg/gotypes"
 	"yunion.io/x/pkg/util/osprofile"
@@ -1168,7 +1169,7 @@ func (self *SGuest) NotifyInitiatorFeishuServerEvent(ctx context.Context, userCr
 			log.Errorln("NotifyInitiatorFeishuServerEvent user staff_id is empty.")
 			return
 		} else {
-			coaUser, _ := modules.CoaUsers.Get(s, staffId, nil)
+			coaUser, _ := thirdparty.CoaUsers.Get(s, staffId, nil)
 			if gotypes.IsNil(coaUser) {
 				log.Errorln("NotifyInitiatorFeishuServerEvent coa user is empty.")
 				return
@@ -1183,7 +1184,7 @@ func (self *SGuest) NotifyInitiatorFeishuServerEvent(ctx context.Context, userCr
 	}
 
 	kwargs.Add(jsonutils.NewString(feishuUserId), "feishu_user_id")
-	_, err := modules.CoaUsers.SendMarkdownMessage(s, kwargs)
+	_, err := thirdparty.CoaUsers.SendMarkdownMessage(s, kwargs)
 	if err != nil {
 		log.Errorf("NotifyInitiatorFeishuServerEvent send message error %v.", err)
 	}
@@ -1241,7 +1242,7 @@ func (self *SGuest) NotifyRobotServerEvent(ctx context.Context, userCred mcclien
 		if staffId == "" {
 			department = displayName
 		} else {
-			coaUser, _ := modules.CoaUsers.Get(s, staffId, nil)
+			coaUser, _ := thirdparty.CoaUsers.Get(s, staffId, nil)
 			if gotypes.IsNil(coaUser) {
 				department = displayName
 			} else {
@@ -1249,7 +1250,7 @@ func (self *SGuest) NotifyRobotServerEvent(ctx context.Context, userCred mcclien
 				if departmentId == "" {
 					department = displayName
 				} else {
-					departmentInfo, _ := modules.CoaUsers.GetDepartment(s, departmentId, nil)
+					departmentInfo, _ := thirdparty.CoaUsers.GetDepartment(s, departmentId, nil)
 					if !gotypes.IsNil(departmentInfo) {
 						department, _ = departmentInfo.GetString("fullname")
 					}
@@ -1292,7 +1293,7 @@ func (self *SGuest) NotifyRobotServerEvent(ctx context.Context, userCred mcclien
 		kwargs.Add(jsonutils.NewString(userCred.GetProjectName()), "tenant")
 	}
 	robotName := "Feishu Robot"
-	robot, _ := modules.NotifyRobot.GetByName(s, robotName, nil)
+	robot, _ := notify.NotifyRobot.GetByName(s, robotName, nil)
 	if gotypes.IsNil(robot) {
 		log.Errorln("NotifyRobotServerEvent robot is null.")
 		return
@@ -1365,7 +1366,7 @@ func (self *SGuest) NotifyRobotServerErrorEvent(ctx context.Context, userCred mc
 	//}
 	s := auth.GetAdminSession(ctx, options.Options.Region)
 	robotName := "Feishu Robot"
-	robot, _ := modules.NotifyRobot.GetByName(s, robotName, nil)
+	robot, _ := notify.NotifyRobot.GetByName(s, robotName, nil)
 	if gotypes.IsNil(robot) {
 		log.Errorln("NotifyRobotServerEvent robot is null.")
 		return
@@ -5522,7 +5523,7 @@ func (self *SGuest) startSwitchToClonedDisk(ctx context.Context, userCred mcclie
 func (self *SGuest) JoinJumpServer(ctx context.Context, userCred mcclient.TokenCredential, input *api.ServerCreateInput, ip string) error {
 	//check assets
 	s := auth.GetAdminSession(ctx, "")
-	asset, err := modules.JsAsset.GetByIP(s, ip, nil)
+	asset, err := thirdparty.JsAsset.GetByIP(s, ip, nil)
 	if err != nil {
 		log.Errorf("get jumpserver asset fail for %s, %v", ip, err)
 		return err
@@ -5548,7 +5549,7 @@ func (self *SGuest) JoinJumpServer(ctx context.Context, userCred mcclient.TokenC
 	}
 
 	params, _ := in.Params()
-	asset, err = modules.JsAsset.Create(s, params)
+	asset, err = thirdparty.JsAsset.Create(s, params)
 	if err != nil {
 		log.Errorf("create jumpserver asset %s failed: %v", ip, err)
 		return err
@@ -5586,7 +5587,7 @@ func (self *SGuest) JoinJumpServer(ctx context.Context, userCred mcclient.TokenC
 		log.Errorf("user email is empty %s", userCred.GetUserName())
 		return err
 	}
-	jsUser, err := modules.JsAsset.GetUser(s, email, nil)
+	jsUser, err := thirdparty.JsAsset.GetUser(s, email, nil)
 	if err != nil {
 		log.Errorf("get jumpserver user fail for %s, %v", email, err)
 		return err
@@ -5600,7 +5601,7 @@ func (self *SGuest) JoinJumpServer(ctx context.Context, userCred mcclient.TokenC
 		userCreateOptions.Email = email
 		userCreateOptions.Source = "ldap"
 		userParams, _ := userCreateOptions.Params()
-		jsUser, err = modules.JsAsset.CreateUser(s, userParams)
+		jsUser, err = thirdparty.JsAsset.CreateUser(s, userParams)
 		if err != nil {
 			log.Errorf("create jumpserver user fail for %s, %v", email, err)
 			return err
@@ -5622,7 +5623,7 @@ func (self *SGuest) JoinJumpServer(ctx context.Context, userCred mcclient.TokenC
 		permName = emailPrefix + "-SSH"
 		systemUser = systemUsers["SSH"]
 	}
-	jsPerm, err := modules.JsAsset.GetPermsByName(s, permName, nil)
+	jsPerm, err := thirdparty.JsAsset.GetPermsByName(s, permName, nil)
 	if err != nil {
 		log.Errorf("get jumpserver asset perms fail for %s, %v", permName, err)
 		return err
@@ -5642,7 +5643,7 @@ func (self *SGuest) JoinJumpServer(ctx context.Context, userCred mcclient.TokenC
 		}
 		permCreateOptions.Actions = []string{"all"}
 		permParams, _ := permCreateOptions.Params()
-		_, err = modules.JsAsset.CreatePerms(s, permParams)
+		_, err = thirdparty.JsAsset.CreatePerms(s, permParams)
 		if err != nil {
 			log.Errorf("create jumpserver asset perms fail for %s, %v", permName, err)
 			return err
@@ -5679,7 +5680,7 @@ func (self *SGuest) JoinJumpServer(ctx context.Context, userCred mcclient.TokenC
 			}
 		}
 		permParams, _ := permUpdateOptions.Params()
-		_, err = modules.JsAsset.PatchPerms(s, permUpdateOptions.Id, permParams)
+		_, err = thirdparty.JsAsset.PatchPerms(s, permUpdateOptions.Id, permParams)
 		if err != nil {
 			log.Errorf("patch jumpserver asset perms fail for %s, %v", permName, err)
 			return err

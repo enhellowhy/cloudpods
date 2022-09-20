@@ -32,6 +32,7 @@ import (
 	_ "yunion.io/x/onecloud/pkg/mcclient/modules/quota"
 	_ "yunion.io/x/onecloud/pkg/mcclient/modules/scheduledtask"
 	_ "yunion.io/x/onecloud/pkg/mcclient/modules/scheduler"
+	_ "yunion.io/x/onecloud/pkg/mcclient/modules/thirdparty"
 	_ "yunion.io/x/onecloud/pkg/mcclient/modules/webconsole"
 	_ "yunion.io/x/onecloud/pkg/mcclient/modules/yunionconf"
 )

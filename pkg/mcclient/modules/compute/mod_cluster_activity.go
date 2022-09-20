@@ -12,19 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package modules
+package compute
 
-import "yunion.io/x/onecloud/pkg/mcclient/modulebase"
+import (
+	"yunion.io/x/onecloud/pkg/mcclient/modulebase"
+	"yunion.io/x/onecloud/pkg/mcclient/modules"
+)
 
 var (
 	ClusterActivity modulebase.ResourceManager
 )
 
 func init() {
-	ClusterActivity = NewComputeManager("clusteractivity", "clusteractivities",
+	ClusterActivity = modules.NewComputeManager("clusteractivity", "clusteractivities",
 		[]string{"ID", "Name", "Migrate_Number", "Trigger_Desc", "Action_Desc", "Status", "Start_Time",
 			"End_Time", "Reason"},
 		[]string{},
 	)
-	registerCompute(&ClusterActivity)
+	modules.RegisterCompute(&ClusterActivity)
 }

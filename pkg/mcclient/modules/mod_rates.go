@@ -38,7 +38,7 @@ func init() {
 		[]string{"Id", "Model", "Brand"},
 		[]string{},
 	)}
-	register(&Rates)
+	Register(&Rates)
 }
 
 const (

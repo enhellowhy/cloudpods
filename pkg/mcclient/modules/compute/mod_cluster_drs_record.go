@@ -12,10 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package modules
+package compute
 
 import (
 	"yunion.io/x/onecloud/pkg/mcclient/modulebase"
+	"yunion.io/x/onecloud/pkg/mcclient/modules"
 )
 
 type DrsRecordManager struct {
@@ -28,12 +29,12 @@ var (
 
 func init() {
 	DrsRecords = NewDrsRecordManager()
-	registerCompute(DrsRecords)
+	modules.RegisterCompute(DrsRecords)
 	//register(DrsRecordManager)
 }
 
 func NewDrsRecordManager() *DrsRecordManager {
-	man := NewComputeManager("drsrecord", "drsrecords",
+	man := modules.NewComputeManager("drsrecord", "drsrecords",
 		[]string{"id", "cluster_id", "guest_name", "guest_id", "from_host_id", "from_host_name", "to_host_id", "to_host_name", "opt_time"},
 		[]string{})
 	return &DrsRecordManager{

@@ -22,7 +22,7 @@ import (
 	"yunion.io/x/jsonutils"
 	"yunion.io/x/log"
 	"yunion.io/x/onecloud/pkg/mcclient/auth"
-	"yunion.io/x/onecloud/pkg/mcclient/modules"
+	"yunion.io/x/onecloud/pkg/mcclient/modules/identity"
 	"yunion.io/x/pkg/tristate"
 	"yunion.io/x/pkg/utils"
 	"yunion.io/x/sqlchemy"
@@ -295,11 +295,11 @@ func isStorageLocalUsed(ctx context.Context, projectId string) bool {
 	//var ret []db.SMetadata
 	//q := db.Metadata.Query().Equals("obj_type", "project").Equals("key", db.USER_TAG_PREFIX+api.STORAGE_LOCAL).Equals("value", "true")
 	//err := db.FetchModelObjects(db.Metadata, q, &ret)
-	s := auth.GetAdminSession(ctx, options.Options.Region, "")
+	s := auth.GetAdminSession(ctx, options.Options.Region)
 	//localParams := new(jsonutils.JSONDict)
 	//localParams.Set(db.USER_TAG_PREFIX+api.STORAGE_LOCAL, jsonutils.Marshal("true"))
 	//meta, err := modules.Projects.GetMetadata(s, projectId, localParams)
-	meta, err := modules.Projects.GetMetadata(s, projectId, nil)
+	meta, err := identity.Projects.GetMetadata(s, projectId, nil)
 	if err != nil {
 		log.Errorf("isStorageLocalUsedForProjectsOfCapability: %v", err)
 		return false

@@ -23,13 +23,14 @@ import (
 	"yunion.io/x/log"
 	"yunion.io/x/onecloud/pkg/apis/compute"
 	apis "yunion.io/x/onecloud/pkg/apis/workflow"
+	computemod "yunion.io/x/onecloud/pkg/mcclient/modules/compute"
+	"yunion.io/x/onecloud/pkg/mcclient/modules/scheduler"
 	"yunion.io/x/pkg/util/sets"
 	//"yunion.io/x/onecloud/pkg/cloudcommon/cmdline"
 	"yunion.io/x/onecloud/pkg/cloudcommon/db"
 	"yunion.io/x/onecloud/pkg/cloudcommon/db/taskman"
 	"yunion.io/x/onecloud/pkg/mcclient"
 	"yunion.io/x/onecloud/pkg/mcclient/auth"
-	"yunion.io/x/onecloud/pkg/mcclient/modules"
 	"yunion.io/x/onecloud/pkg/util/httputils"
 	"yunion.io/x/onecloud/pkg/util/logclient"
 	"yunion.io/x/onecloud/pkg/workflow/options"
@@ -69,7 +70,7 @@ func (self *MachineApplyTask) OnInit(ctx context.Context, obj db.IStandaloneMode
 	}
 
 	//session := new(mcclient.ClientSession)
-	session := auth.GetSession(ctx, self.UserCred, options.Options.Region, "")
+	session := auth.GetSession(ctx, self.UserCred, options.Options.Region)
 	valid := self.UserCred.IsValid()
 	if !valid {
 		//if !valid || session.GetToken().GetTokenString() == auth.GUEST_TOKEN {
@@ -78,7 +79,7 @@ func (self *MachineApplyTask) OnInit(ctx context.Context, obj db.IStandaloneMode
 		//	self.taskFailed(ctx, workflow, "fail to parse workflow setting")
 		//	return
 		//}
-		session = auth.GetAdminSession(ctx, options.Options.Region, "")
+		session = auth.GetAdminSession(ctx, options.Options.Region)
 		self.UserCred = session.GetToken()
 	}
 
@@ -184,7 +185,7 @@ func (self *MachineApplyTask) createInstances(session *mcclient.ClientSession, p
 
 	dict := params.(*jsonutils.JSONDict)
 	dict.Set("count", jsonutils.NewInt(int64(count)))
-	_, err = modules.SchedManager.DoForecast(session, dict)
+	_, err = scheduler.SchedManager.DoForecast(session, dict)
 	if err != nil {
 		clientErr := err.(*httputils.JSONClientError)
 		failedList = append(failedList, clientErr.Details)
@@ -194,7 +195,7 @@ func (self *MachineApplyTask) createInstances(session *mcclient.ClientSession, p
 	dict.Remove("count")
 
 	if count == 1 {
-		ret, err := modules.Servers.Create(session, params)
+		ret, err := computemod.Servers.Create(session, params)
 		if err != nil {
 			clientErr := err.(*httputils.JSONClientError)
 			failedList = append(failedList, clientErr.Details)
@@ -205,7 +206,7 @@ func (self *MachineApplyTask) createInstances(session *mcclient.ClientSession, p
 		succeedList = append(succeedList, SInstance{id, name})
 		return failedList, succeedList
 	}
-	rets := modules.Servers.BatchCreate(session, params, count)
+	rets := computemod.Servers.BatchCreate(session, params, count)
 	for _, ret := range rets {
 		if ret.Status >= 400 {
 			failedList = append(failedList, ret.Data.String())
@@ -234,7 +235,7 @@ func (self *MachineApplyTask) checkAllServer(session *mcclient.ClientSession, gu
 		select {
 		default:
 			for _, id := range guestIDSet.UnsortedList() {
-				ret, e := modules.Servers.GetSpecific(session, id, "status", nil)
+				ret, e := computemod.Servers.GetSpecific(session, id, "status", nil)
 				if e != nil {
 					log.Errorf("Servers.GetSpecific failed: %s", e)
 					<-ticker.C

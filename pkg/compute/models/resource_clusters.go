@@ -256,18 +256,6 @@ func (self *SCluster) AllowGetDetails(ctx context.Context, userCred mcclient.Tok
 	return true
 }
 
-func (self *SClusterManager) AllowCreateItem(ctx context.Context, userCred mcclient.TokenCredential, query jsonutils.JSONObject, data jsonutils.JSONObject) bool {
-	return db.IsAdminAllowCreate(userCred, self)
-}
-
-func (self *SCluster) AllowUpdateItem(ctx context.Context, userCred mcclient.TokenCredential) bool {
-	return db.IsAdminAllowUpdate(userCred, self)
-}
-
-func (self *SCluster) AllowDeleteItem(ctx context.Context, userCred mcclient.TokenCredential, query jsonutils.JSONObject, data jsonutils.JSONObject) bool {
-	return db.IsAdminAllowDelete(userCred, self)
-}
-
 func validateClusterStrategy(strategy string) error {
 	if !utils.IsInStringArray(strategy, CLUSTER_STRATEGY_LIST) {
 		return httperrors.NewInputParameterError("Invalid stragegy %s", strategy)
@@ -507,10 +495,6 @@ func GetClusters(jointMan IClusterJointManager, masterId string) []SCluster {
 	return tags
 }
 
-func AllowPerformSetResourceCluster(obj db.IModel, ctx context.Context, userCred mcclient.TokenCredential, query jsonutils.JSONObject, data jsonutils.JSONObject) bool {
-	return db.IsAdminAllowPerform(userCred, obj, "set-cluster")
-}
-
 func PerformSetResourceCluster(obj IModelWithCluster, ctx context.Context, userCred mcclient.TokenCredential, query jsonutils.JSONObject, data jsonutils.JSONObject) (jsonutils.JSONObject, error) {
 	clusters := jsonutils.GetArrayOfPrefix(data, "cluster")
 	setClustersId := []string{}
@@ -599,15 +583,6 @@ func (s *SCluster) AllowPerformSetScope(ctx context.Context, userCred mcclient.T
 
 func (s *SCluster) PerformSetScope(ctx context.Context, userCred mcclient.TokenCredential, query jsonutils.JSONObject, data jsonutils.JSONObject) (jsonutils.JSONObject, error) {
 	return db.PerformSetScope(ctx, s, userCred, data)
-}
-
-func (s *SCluster) AllowPerformDrsEnabled(
-	ctx context.Context,
-	userCred mcclient.TokenCredential,
-	query jsonutils.JSONObject,
-	data jsonutils.JSONObject,
-) bool {
-	return db.IsAdminAllowPerform(userCred, s, "drs-enabled")
 }
 
 func (s *SCluster) PerformDrsEnabled(

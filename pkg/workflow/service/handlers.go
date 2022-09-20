@@ -39,6 +39,8 @@ func initHandlers(app *appsrv.Application) {
 	}
 
 	for _, manager := range []db.IModelManager{
+		db.Metadata,
+
 		models.WorkflowProcessDefineManager,
 		models.WorkflowProcessInstanceManager,
 	} {

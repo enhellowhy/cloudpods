@@ -903,7 +903,7 @@ func (self *SCloudprovider) GetCloudaccount() (*SCloudaccount, error) {
 }
 
 func (self *SCloudprovider) GetObjectStoreStats() (map[string]interface{}, error) {
-	provider, err := self.GetProvider()
+	provider, err := self.GetProvider(context.Background())
 	if err != nil {
 		return nil, err
 	}
@@ -911,7 +911,7 @@ func (self *SCloudprovider) GetObjectStoreStats() (map[string]interface{}, error
 }
 
 func (self *SCloudprovider) GetObjectStoreUserSamples(from, interval string) (map[string]interface{}, error) {
-	provider, err := self.GetProvider()
+	provider, err := self.GetProvider(context.Background())
 	if err != nil {
 		return nil, err
 	}

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package modules
+package thirdparty
 
 import (
 	"errors"
@@ -22,6 +22,8 @@ import (
 	"yunion.io/x/onecloud/pkg/apis"
 	"yunion.io/x/onecloud/pkg/mcclient"
 	"yunion.io/x/onecloud/pkg/mcclient/modulebase"
+	"yunion.io/x/onecloud/pkg/mcclient/modules"
+	"yunion.io/x/onecloud/pkg/mcclient/modules/identity"
 )
 
 type JumpServerAssetManager struct {
@@ -33,13 +35,13 @@ var (
 )
 
 func init() {
-	JsAsset = JumpServerAssetManager{NewJumpServerManager("jsasset", "jsassets",
+	JsAsset = JumpServerAssetManager{modules.NewJumpServerManager("jsasset", "jsassets",
 		[]string{"ID", "Key", "Name", "Value", "Org_id", "Org_name", "Full_value"},
 		//[]string{},
 		[]string{},
 	)}
 
-	register(&JsAsset)
+	modulebase.Register(&JsAsset)
 }
 
 func (this *JumpServerAssetManager) List(session *mcclient.ClientSession, params jsonutils.JSONObject) (*modulebase.ListResult, error) {
@@ -50,7 +52,7 @@ func (this *JumpServerAssetManager) List(session *mcclient.ClientSession, params
 	}
 
 	header := http.Header{}
-	header.Set(Authorization, token)
+	header.Set(modules.Authorization, token)
 	_, body, err := modulebase.JsonRequest(this.ResourceManager, session, "GET", path, header, nil)
 	if err != nil {
 		return nil, err
@@ -88,7 +90,7 @@ func (this *JumpServerAssetManager) ListUser(session *mcclient.ClientSession, pa
 	}
 
 	header := http.Header{}
-	header.Set(Authorization, token)
+	header.Set(modules.Authorization, token)
 	_, body, err := modulebase.JsonRequest(this.ResourceManager, session, "GET", path, header, nil)
 	if err != nil {
 		return nil, err
@@ -126,7 +128,7 @@ func (this *JumpServerAssetManager) ListAssetPerms(session *mcclient.ClientSessi
 	}
 
 	header := http.Header{}
-	header.Set(Authorization, token)
+	header.Set(modules.Authorization, token)
 	_, body, err := modulebase.JsonRequest(this.ResourceManager, session, "GET", path, header, nil)
 	if err != nil {
 		return nil, err
@@ -164,7 +166,7 @@ func (this *JumpServerAssetManager) Create(session *mcclient.ClientSession, para
 	}
 
 	header := http.Header{}
-	header.Set(Authorization, token)
+	header.Set(modules.Authorization, token)
 	//data := params.(*jsonutils.JSONDict)
 	//data.Set("domain_id", jsonutils.NewString(domainId))
 	//data.Set("project_id", jsonutils.NewString(projectId))
@@ -188,7 +190,7 @@ func (this *JumpServerAssetManager) CreateUser(session *mcclient.ClientSession, 
 	}
 
 	header := http.Header{}
-	header.Set(Authorization, token)
+	header.Set(modules.Authorization, token)
 	//data := params.(*jsonutils.JSONDict)
 	//data.Set("domain_id", jsonutils.NewString(domainId))
 	//data.Set("project_id", jsonutils.NewString(projectId))
@@ -212,7 +214,7 @@ func (this *JumpServerAssetManager) CreatePerms(session *mcclient.ClientSession,
 	}
 
 	header := http.Header{}
-	header.Set(Authorization, token)
+	header.Set(modules.Authorization, token)
 	//data := params.(*jsonutils.JSONDict)
 	//data.Set("domain_id", jsonutils.NewString(domainId))
 	//data.Set("project_id", jsonutils.NewString(projectId))
@@ -236,7 +238,7 @@ func (this *JumpServerAssetManager) Delete(session *mcclient.ClientSession, id s
 	}
 
 	header := http.Header{}
-	header.Set(Authorization, token)
+	header.Set(modules.Authorization, token)
 	_, _, err = modulebase.JsonRequest(this.ResourceManager, session, "DELETE", path, header, nil)
 	if err != nil {
 		return nil, err
@@ -254,7 +256,7 @@ func (this *JumpServerAssetManager) Get(session *mcclient.ClientSession, id stri
 	}
 
 	header := http.Header{}
-	header.Set(Authorization, token)
+	header.Set(modules.Authorization, token)
 	_, body, err := modulebase.JsonRequest(this.ResourceManager, session, "GET", path, header, params)
 	if err != nil {
 		return nil, err
@@ -273,7 +275,7 @@ func (this *JumpServerAssetManager) GetByIP(session *mcclient.ClientSession, ip 
 	}
 
 	header := http.Header{}
-	header.Set(Authorization, token)
+	header.Set(modules.Authorization, token)
 	_, body, err := modulebase.JsonRequest(this.ResourceManager, session, "GET", path, header, params)
 	if err != nil {
 		return nil, err
@@ -303,7 +305,7 @@ func (this *JumpServerAssetManager) GetPermsByName(session *mcclient.ClientSessi
 	}
 
 	header := http.Header{}
-	header.Set(Authorization, token)
+	header.Set(modules.Authorization, token)
 	_, body, err := modulebase.JsonRequest(this.ResourceManager, session, "GET", path, header, params)
 	if err != nil {
 		return nil, err
@@ -330,7 +332,7 @@ func (this *JumpServerAssetManager) PatchPerms(session *mcclient.ClientSession, 
 	}
 
 	header := http.Header{}
-	header.Set(Authorization, token)
+	header.Set(modules.Authorization, token)
 	//data := params.(*jsonutils.JSONDict)
 	//data.Set("domain_id", jsonutils.NewString(domainId))
 	//data.Set("project_id", jsonutils.NewString(projectId))
@@ -354,7 +356,7 @@ func (this *JumpServerAssetManager) GetUser(session *mcclient.ClientSession, ema
 	}
 
 	header := http.Header{}
-	header.Set(Authorization, token)
+	header.Set(modules.Authorization, token)
 	_, body, err := modulebase.JsonRequest(this.ResourceManager, session, "GET", path, header, params)
 	if err != nil {
 		return nil, err
@@ -385,15 +387,15 @@ func (this *JumpServerAssetManager) GetUser(session *mcclient.ClientSession, ema
 }
 
 func (this *JumpServerAssetManager) getServiceAuthorizationToken(session *mcclient.ClientSession) (string, error) {
-	result, err := ServicesV3.GetByName(session, apis.SERVICE_TYPE_JUMPSERVER, nil)
+	result, err := identity.ServicesV3.GetByName(session, apis.SERVICE_TYPE_JUMPSERVER, nil)
 	if err != nil {
 		return "", err
 	}
-	extra, err := result.Get(Extra)
+	extra, err := result.Get(modules.Extra)
 	if err != nil {
 		return "", err
 	}
-	token, err := extra.GetString(Authorization)
+	token, err := extra.GetString(modules.Authorization)
 	if err != nil {
 		return "", err
 	}

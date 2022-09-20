@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package modules
+package thirdparty
 
 import (
 	"fmt"
@@ -20,6 +20,8 @@ import (
 	"yunion.io/x/onecloud/pkg/apis"
 	"yunion.io/x/onecloud/pkg/mcclient"
 	"yunion.io/x/onecloud/pkg/mcclient/modulebase"
+	"yunion.io/x/onecloud/pkg/mcclient/modules"
+	"yunion.io/x/onecloud/pkg/mcclient/modules/identity"
 )
 
 type ZabbixManager struct {
@@ -31,12 +33,12 @@ var (
 )
 
 func init() {
-	Zabbix = ZabbixManager{NewZabbixManager("zabbix", "zabbixs",
+	Zabbix = ZabbixManager{modules.NewZabbixManager("zabbix", "zabbixs",
 		[]string{},
 		[]string{},
 	)}
 
-	register(&Zabbix)
+	modulebase.Register(&Zabbix)
 }
 
 func (this *ZabbixManager) jsonRpc(session *mcclient.ClientSession, params jsonutils.JSONObject) (jsonutils.JSONObject, error) {
@@ -50,13 +52,13 @@ func (this *ZabbixManager) jsonRpc(session *mcclient.ClientSession, params jsonu
 	if resp == nil {
 		return nil, fmt.Errorf("zabbix json rpc response empty")
 	}
-	_, err = resp.Get(Result)
+	_, err = resp.Get(modules.Result)
 	if err != nil {
-		respError, e := resp.Get(Error)
+		respError, e := resp.Get(modules.Error)
 		if e != nil {
 			return nil, fmt.Errorf("zabbix json rpc response get 'error' failed %v", e)
 		}
-		data, e := respError.GetString(Data)
+		data, e := respError.GetString(modules.Data)
 		if e != nil {
 			return nil, e
 		}
@@ -137,7 +139,7 @@ func (this *ZabbixManager) UserLogin(session *mcclient.ClientSession) (string, e
 	if body == nil {
 		return "", fmt.Errorf("empty response")
 	}
-	auth, err := body.GetString(Result)
+	auth, err := body.GetString(modules.Result)
 	if err != nil {
 		return "", err
 	}
@@ -146,14 +148,14 @@ func (this *ZabbixManager) UserLogin(session *mcclient.ClientSession) (string, e
 		return auth, nil
 	}
 
-	errBody, err := body.Get(Error)
+	errBody, err := body.Get(modules.Error)
 	if err != nil {
 		return "", err
 	}
 	if errBody == nil {
 		return "", fmt.Errorf("error body is null?")
 	}
-	data, err := errBody.GetString(Data)
+	data, err := errBody.GetString(modules.Data)
 	if err != nil {
 		return "", err
 	}
@@ -188,7 +190,7 @@ func (this *ZabbixManager) HostGet(session *mcclient.ClientSession, auth, host, 
 	if err != nil {
 		return "", err
 	}
-	hosts, _ := resp.GetArray(Result)
+	hosts, _ := resp.GetArray(modules.Result)
 	if len(hosts) == 0 {
 		return "", nil
 	}
@@ -236,19 +238,19 @@ func (this *ZabbixManager) HostEnable(session *mcclient.ClientSession, auth, hos
 }
 
 func (this *ZabbixManager) getServiceUserPassword(session *mcclient.ClientSession) (string, string, error) {
-	result, err := ServicesV3.GetByName(session, apis.SERVICE_TYPE_ZABBIX, nil)
+	result, err := identity.ServicesV3.GetByName(session, apis.SERVICE_TYPE_ZABBIX, nil)
 	if err != nil {
 		return "", "", err
 	}
-	extra, err := result.Get(Extra)
+	extra, err := result.Get(modules.Extra)
 	if err != nil {
 		return "", "", err
 	}
-	user, err := extra.GetString(User)
+	user, err := extra.GetString(modules.User)
 	if err != nil {
 		return "", "", err
 	}
-	password, err := extra.GetString(Password)
+	password, err := extra.GetString(modules.Password)
 	if err != nil {
 		return "", "", err
 	}

@@ -17,7 +17,7 @@ package identity
 import (
 	"yunion.io/x/jsonutils"
 	"yunion.io/x/onecloud/pkg/mcclient"
-	"yunion.io/x/onecloud/pkg/mcclient/modules"
+	"yunion.io/x/onecloud/pkg/mcclient/modules/thirdparty"
 )
 
 func init() {
@@ -25,7 +25,7 @@ func init() {
 		ID string `json:"-"`
 	}
 	R(&CoaUserGetOptions{}, "coa-user-show", "Show coa user", func(s *mcclient.ClientSession, opts *CoaUserGetOptions) error {
-		user, err := modules.CoaUsers.Get(s, opts.ID, nil)
+		user, err := thirdparty.CoaUsers.Get(s, opts.ID, nil)
 		if err != nil {
 			return err
 		}
@@ -33,7 +33,7 @@ func init() {
 		return nil
 	})
 	R(&CoaUserGetOptions{}, "coa-department-show", "Show coa department info", func(s *mcclient.ClientSession, opts *CoaUserGetOptions) error {
-		dep, err := modules.CoaUsers.GetDepartment(s, opts.ID, nil)
+		dep, err := thirdparty.CoaUsers.GetDepartment(s, opts.ID, nil)
 		if err != nil {
 			return err
 		}
@@ -54,7 +54,7 @@ func init() {
 		//kwargs.Add(jsonutils.NewInt(2), "platform")
 		//kwargs.Add(jsonutils.NewString("6976628827972109861"), "feishu_user_id")
 		//dep, err := modules.CoaUsers.SendMarkdownMessage(s, kwargs)
-		dep, err := modules.CoaUsers.SendMarkdownMessage(s, jsonutils.Marshal(opts).(*jsonutils.JSONDict))
+		dep, err := thirdparty.CoaUsers.SendMarkdownMessage(s, jsonutils.Marshal(opts).(*jsonutils.JSONDict))
 		if err != nil {
 			return err
 		}

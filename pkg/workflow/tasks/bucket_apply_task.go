@@ -27,7 +27,7 @@ import (
 	"yunion.io/x/onecloud/pkg/cloudcommon/db/taskman"
 	"yunion.io/x/onecloud/pkg/mcclient"
 	"yunion.io/x/onecloud/pkg/mcclient/auth"
-	"yunion.io/x/onecloud/pkg/mcclient/modules"
+	computemod "yunion.io/x/onecloud/pkg/mcclient/modules/compute"
 	"yunion.io/x/onecloud/pkg/util/httputils"
 	"yunion.io/x/onecloud/pkg/util/logclient"
 	"yunion.io/x/onecloud/pkg/workflow/models"
@@ -65,10 +65,10 @@ func (self *BucketApplyTask) OnInit(ctx context.Context, obj db.IStandaloneModel
 		return
 	}
 
-	session := auth.GetSession(ctx, self.UserCred, options.Options.Region, "")
+	session := auth.GetSession(ctx, self.UserCred, options.Options.Region)
 	valid := self.UserCred.IsValid()
 	if !valid {
-		session = auth.GetAdminSession(ctx, options.Options.Region, "")
+		session = auth.GetAdminSession(ctx, options.Options.Region)
 		self.UserCred = session.GetToken()
 	}
 
@@ -132,7 +132,7 @@ func (self *BucketApplyTask) createInstances(session *mcclient.ClientSession, pa
 	}
 	//count := 1
 
-	ret, err := modules.Buckets.Create(session, params)
+	ret, err := computemod.Buckets.Create(session, params)
 	if err != nil {
 		clientErr := err.(*httputils.JSONClientError)
 		failedList = append(failedList, clientErr.Details)
@@ -160,7 +160,7 @@ func (self *BucketApplyTask) checkAllBuckets(session *mcclient.ClientSession, bu
 		select {
 		default:
 			for _, id := range bucketIDSet.UnsortedList() {
-				ret, e := modules.Buckets.GetSpecific(session, id, "status", nil)
+				ret, e := computemod.Buckets.GetSpecific(session, id, "status", nil)
 				if e != nil {
 					log.Errorf("Buckets.GetSpecific failed: %s", e)
 					<-ticker.C

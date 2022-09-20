@@ -36,19 +36,23 @@ import (
 	"yunion.io/x/onecloud/pkg/util/httputils"
 )
 
+const XMS_API_TOKEN = "bc4addf9febd425886ae95d9a1450b98"
+
 type sManagerDelegate struct {
-	buckets *hashcache.Cache
-	users   *hashcache.Cache
-	keys    *hashcache.Cache
+	buckets   *hashcache.Cache
+	users     *hashcache.Cache
+	keys      *hashcache.Cache
+	s3LbGroup *hashcache.Cache
 }
 
 var managerDelegate *sManagerDelegate
 
 func init() {
 	managerDelegate = &sManagerDelegate{
-		buckets: hashcache.NewCache(2048, time.Minute*15),
-		users:   hashcache.NewCache(2048, time.Minute*15),
-		keys:    hashcache.NewCache(2048, time.Minute*15),
+		buckets:   hashcache.NewCache(2048, time.Minute*15),
+		users:     hashcache.NewCache(2048, time.Minute*15),
+		keys:      hashcache.NewCache(2048, time.Minute*15),
+		s3LbGroup: hashcache.NewCache(10, time.Hour*24),
 	}
 }
 
@@ -107,6 +111,18 @@ func (manager *sManagerDelegate) setCacheKey(key *sKey) {
 	manager.keys.AtomicSet(key.AccessKey, key)
 }
 
+func (manager *sManagerDelegate) getCacheS3LbGroup() (*sS3LbGroupResponse, error) {
+	val := manager.s3LbGroup.Get("s3_load_balancer_groups")
+	if !gotypes.IsNil(val) {
+		return val.(*sS3LbGroupResponse), nil
+	}
+	return nil, nil
+}
+
+func (manager *sManagerDelegate) setCacheS3LbGroup(group *sS3LbGroupResponse) {
+	manager.keys.AtomicSet("s3_load_balancer_groups", group)
+}
+
 type SXskyAdminApi struct {
 	endpoint string
 	username string
@@ -153,9 +169,10 @@ func (api *SXskyAdminApi) jsonRequest(ctx context.Context, method httputils.THtt
 		}
 	}
 
-	if api.isValidToken() {
-		req.Header.Set("xms-auth-token", api.token.Token.Uuid)
-	}
+	req.Header.Set("xms-auth-token", XMS_API_TOKEN)
+	//if api.isValidToken() {
+	//	req.Header.Set("xms-auth-token", api.token.Token.Uuid)
+	//}
 
 	if api.debug {
 		log.Debugf("request: %s %s %s %s", method, urlStr, req.Header, body)
@@ -248,13 +265,13 @@ type SAuthTokenReq struct {
 }
 
 func (api *SXskyAdminApi) authRequest(ctx context.Context, method httputils.THttpMethod, path string, hdr http.Header, body jsonutils.JSONObject) (http.Header, jsonutils.JSONObject, error) {
-	if !api.isValidToken() {
-		loginResp, err := api.auth(ctx)
-		if err != nil {
-			return nil, nil, errors.Wrap(err, "api.auth")
-		}
-		api.token = loginResp
-	}
+	//if !api.isValidToken() {
+	//	loginResp, err := api.auth(ctx)
+	//	if err != nil {
+	//		return nil, nil, errors.Wrap(err, "api.auth")
+	//	}
+	//	api.token = loginResp
+	//}
 	return api.jsonRequest(ctx, method, path, hdr, body)
 }
 
@@ -1015,6 +1032,7 @@ func (api *SXskyAdminApi) getS3LbGroup(ctx context.Context) ([]sS3LbGroup, error
 		if err != nil {
 			return nil, errors.Wrap(err, "resp.Unmarshal")
 		}
+		managerDelegate.setCacheS3LbGroup(&output)
 		lbGroups = append(lbGroups, output.S3LoadBalancerGroups...)
 		totalCount = output.Paging.TotalCount
 	}
@@ -1022,9 +1040,16 @@ func (api *SXskyAdminApi) getS3LbGroup(ctx context.Context) ([]sS3LbGroup, error
 }
 
 func (api *SXskyAdminApi) getS3GatewayEndpoint(ctx context.Context) (string, error) {
-	s3LbGrps, err := api.getS3LbGroup(ctx)
-	if err != nil {
-		return "", errors.Wrap(err, "api.getS3LbGroup")
+	var err error
+	s3LbGrps := make([]sS3LbGroup, 0)
+	cache, _ := managerDelegate.getCacheS3LbGroup()
+	if cache == nil {
+		s3LbGrps, err = api.getS3LbGroup(ctx)
+		if err != nil {
+			return "", errors.Wrap(err, "api.getS3LbGroup")
+		}
+	} else {
+		s3LbGrps = append(s3LbGrps, cache.S3LoadBalancerGroups...)
 	}
 	lbs := make([]sS3LoadBalancer, 0)
 	for i := range s3LbGrps {

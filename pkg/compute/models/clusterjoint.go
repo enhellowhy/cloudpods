@@ -66,14 +66,6 @@ func (manager *SClusterJointsManager) GetSlaveFieldName() string {
 	return "cluster_id"
 }
 
-func (man *SClusterJointsManager) AllowListItems(ctx context.Context, userCred mcclient.TokenCredential, query jsonutils.JSONObject) bool {
-	return db.IsAdminAllowList(userCred, man)
-}
-
-func (man *SClusterJointsManager) AllowCreateItem(ctx context.Context, userCred mcclient.TokenCredential, query jsonutils.JSONObject, data jsonutils.JSONObject) bool {
-	return db.IsAdminAllowCreate(userCred, man)
-}
-
 func (man *SClusterJointsManager) FetchClusterById(id string) *SCluster {
 	clusterObj, _ := ClusterManager.FetchById(id)
 	if clusterObj == nil {
@@ -112,28 +104,8 @@ func (man *SClusterJointsManager) ValidateCreateData(ctx context.Context, userCr
 	return data, nil
 }
 
-func (man *SClusterJointsManager) AllowListDescendent(ctx context.Context, userCred mcclient.TokenCredential, model db.IStandaloneModel, query jsonutils.JSONObject) bool {
-	return db.IsAdminAllowList(userCred, man)
-}
-
 func (man *SClusterJointsManager) GetResourceIdKey(m db.IJointModelManager) string {
 	return fmt.Sprintf("%s_id", m.GetMasterManager().Keyword())
-}
-
-func (man *SClusterJointsManager) AllowAttach(ctx context.Context, userCred mcclient.TokenCredential, master db.IStandaloneModel, slave db.IStandaloneModel) bool {
-	return db.IsAdminAllowCreate(userCred, man)
-}
-
-func (self *SClusterJointsBase) AllowGetDetails(ctx context.Context, userCred mcclient.TokenCredential, query jsonutils.JSONObject) bool {
-	return db.IsAdminAllowGet(userCred, self)
-}
-
-func (self *SClusterJointsBase) AllowUpdateItem(ctx context.Context, userCred mcclient.TokenCredential) bool {
-	return db.IsAdminAllowUpdate(userCred, self)
-}
-
-func (self *SClusterJointsBase) AllowDeleteItem(ctx context.Context, userCred mcclient.TokenCredential, query jsonutils.JSONObject, data jsonutils.JSONObject) bool {
-	return db.IsAdminAllowDelete(userCred, self)
 }
 
 func (joint *SClusterJointsBase) GetClusterId() string {

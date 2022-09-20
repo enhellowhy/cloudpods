@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"yunion.io/x/log"
 	"yunion.io/x/onecloud/pkg/mcclient"
-	"yunion.io/x/onecloud/pkg/mcclient/modules"
+	"yunion.io/x/onecloud/pkg/mcclient/modules/monitor"
 
 	"yunion.io/x/jsonutils"
 	api "yunion.io/x/onecloud/pkg/apis/monitor"
@@ -98,7 +98,7 @@ func InfluxdbQuery(
 	inputQuery.Signature = fmt.Sprintf("%x", sha256.Sum256([]byte(data.String())))
 	data1, _ := jsonutils.Marshal(inputQuery).(*jsonutils.JSONDict)
 
-	obj, err := modules.UnifiedMonitorManager.PerformAction(session, "query", "", data1)
+	obj, err := monitor.UnifiedMonitorManager.PerformAction(session, "query", "", data1)
 	if err != nil {
 		log.Errorf("query metrics err in balancer %v", err)
 		return nil, err

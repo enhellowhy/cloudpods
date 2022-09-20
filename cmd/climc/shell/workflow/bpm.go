@@ -16,7 +16,7 @@ package workflow
 
 import (
 	"yunion.io/x/onecloud/pkg/mcclient"
-	"yunion.io/x/onecloud/pkg/mcclient/modules"
+	"yunion.io/x/onecloud/pkg/mcclient/modules/thirdparty"
 )
 
 func init() {
@@ -24,7 +24,7 @@ func init() {
 		ID string `json:"-"`
 	}
 	R(&BpmProcessGetOptions{}, "bpm-process-history", "Show process history", func(s *mcclient.ClientSession, opts *BpmProcessGetOptions) error {
-		info, err := modules.BpmProcess.GetProcessHistorys(s, opts.ID)
+		info, err := thirdparty.BpmProcess.GetProcessHistorys(s, opts.ID)
 		if err != nil {
 			return err
 		}
@@ -32,7 +32,7 @@ func init() {
 		return nil
 	})
 	R(&BpmProcessGetOptions{}, "bpm-process-svg", "Show coa department info", func(s *mcclient.ClientSession, opts *BpmProcessGetOptions) error {
-		info, err := modules.BpmProcess.GetProcessHistorys(s, opts.ID)
+		info, err := thirdparty.BpmProcess.GetProcessHistorys(s, opts.ID)
 		if err != nil {
 			return err
 		}

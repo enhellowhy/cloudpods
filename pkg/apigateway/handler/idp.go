@@ -110,7 +110,7 @@ func (h *AuthHandlers) getIdpSsoRedirectUri(ctx context.Context, w http.Response
 	query.(*jsonutils.JSONDict).Set("idp_nonce", jsonutils.NewString(utils.GenRequestId(4)))
 	state := base64.URLEncoding.EncodeToString([]byte(query.String()))
 	redirectUri := getSsoCallbackUrl(ctx, req, idpId)
-	redirectUri = "https://localhost:30300/api/v1/auth/ssologin"
+	//redirectUri = "https://localhost:30300/api/v1/auth/ssologin"
 	s := auth.GetAdminSession(ctx, FetchRegion(req))
 	input := api.GetIdpSsoRedirectUriInput{
 		RedirectUri: redirectUri,
@@ -272,7 +272,7 @@ func (h *AuthHandlers) internalSsoLogin(ctx context.Context, w http.ResponseWrit
 		}
 		if referer == "" {
 			referer = getSsoAuthCallbackUrl()
-			referer = "http://localhost:8080/auth"
+			//referer = "http://localhost:8080/auth"
 		}
 	}
 	refererUrl, _ := url.Parse(referer)

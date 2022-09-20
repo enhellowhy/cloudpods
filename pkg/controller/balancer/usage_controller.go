@@ -35,7 +35,7 @@ const (
 )
 
 func (bc *SBalancerController) CheckUsageBalance(ctx context.Context, userCred mcclient.TokenCredential, isStart bool) {
-	session := auth.GetSession(ctx, userCred, "", "")
+	session := auth.GetSession(ctx, userCred, "")
 	clusterUsages, err := bc.UsageClustersNeedBalance(session)
 	if err != nil {
 		log.Errorf("UsageClustersNeedBalance: %s", err.Error())

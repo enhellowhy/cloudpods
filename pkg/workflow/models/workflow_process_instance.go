@@ -27,6 +27,8 @@ import (
 	"yunion.io/x/onecloud/pkg/mcclient"
 	"yunion.io/x/onecloud/pkg/mcclient/auth"
 	"yunion.io/x/onecloud/pkg/mcclient/modules"
+	"yunion.io/x/onecloud/pkg/mcclient/modules/identity"
+	"yunion.io/x/onecloud/pkg/mcclient/modules/thirdparty"
 	"yunion.io/x/onecloud/pkg/util/stringutils2"
 	"yunion.io/x/onecloud/pkg/workflow/options"
 	"yunion.io/x/pkg/errors"
@@ -202,7 +204,7 @@ func (manager *SWorkflowProcessInstanceManager) FetchCustomizeColumns(
 	rows := make([]api.WorkflowProcessInstanceDetails, len(objs))
 
 	baseRows := manager.SResourceBaseManager.FetchCustomizeColumns(ctx, userCred, query, objs, fields, isList)
-	s := auth.GetAdminSession(context.Background(), options.Options.Region, "")
+	s := auth.GetAdminSession(context.Background(), options.Options.Region)
 	//recordIds := make([]string, len(objs))
 	for i := range rows {
 		instance := objs[i].(*SWorkflowProcessInstance)
@@ -214,10 +216,10 @@ func (manager *SWorkflowProcessInstanceManager) FetchCustomizeColumns(
 		resourceProjectId, _ := ins.GetString("project_id")
 
 		//serviceObj, err := modules.ServicesV3.Get(s, service, nil)
-		project, _ := modules.Projects.GetById(s, resourceProjectId, nil)
+		project, _ := identity.Projects.GetById(s, resourceProjectId, nil)
 		resourceProjectName, _ := project.GetString("name")
 		//
-		user, _ := modules.UsersV3.GetById(s, instance.Initiator, nil)
+		user, _ := identity.UsersV3.GetById(s, instance.Initiator, nil)
 		var userName string
 		if user == nil {
 			userName = "-"
@@ -225,7 +227,7 @@ func (manager *SWorkflowProcessInstanceManager) FetchCustomizeColumns(
 			userName, _ = user.GetString("displayname")
 		}
 		logs := make([]*api.STask, 0)
-		processList, err := modules.BpmProcess.GetProcessList(s, instance.ExternalId)
+		processList, err := thirdparty.BpmProcess.GetProcessList(s, instance.ExternalId)
 		if err != nil {
 			log.Errorf("Get BPM process err %v", err)
 		}

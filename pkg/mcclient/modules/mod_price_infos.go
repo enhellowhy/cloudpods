@@ -44,7 +44,7 @@ func init() {
 		[]string{},
 		[]string{},
 	)}
-	register(&PriceInfos)
+	Register(&PriceInfos)
 }
 
 func (this *PriceInfoManager) List(session *mcclient.ClientSession, params jsonutils.JSONObject) (*modulebase.ListResult, error) {

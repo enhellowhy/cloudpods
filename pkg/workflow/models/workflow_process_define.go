@@ -113,20 +113,12 @@ func (p *SWorkflowProcessDefine) CustomizeCreate(ctx context.Context, userCred m
 	return nil
 }
 
-func (p *SWorkflowProcessDefine) AllowPerformEnable(ctx context.Context, userCred mcclient.TokenCredential, query jsonutils.JSONObject, input apis.PerformEnableInput) bool {
-	return db.IsAdminAllowPerform(userCred, p, "enable")
-}
-
 func (p *SWorkflowProcessDefine) PerformEnable(ctx context.Context, userCred mcclient.TokenCredential, query jsonutils.JSONObject, input apis.PerformEnableInput) (jsonutils.JSONObject, error) {
 	err := db.EnabledPerformEnable(p, ctx, userCred, true)
 	if err != nil {
 		return nil, errors.Wrap(err, "EnabledPerformEnable")
 	}
 	return nil, nil
-}
-
-func (p *SWorkflowProcessDefine) AllowPerformDisable(ctx context.Context, userCred mcclient.TokenCredential, query jsonutils.JSONObject, input apis.PerformDisableInput) bool {
-	return db.IsAdminAllowPerform(userCred, p, "disable")
 }
 
 func (p *SWorkflowProcessDefine) PerformDisable(ctx context.Context, userCred mcclient.TokenCredential, query jsonutils.JSONObject, input apis.PerformDisableInput) (jsonutils.JSONObject, error) {

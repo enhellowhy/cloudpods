@@ -22,6 +22,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	modules "yunion.io/x/onecloud/pkg/mcclient/modules/compute"
 
 	"yunion.io/x/jsonutils"
 	"yunion.io/x/log"
@@ -2125,7 +2126,7 @@ func (manager *SGuestManager) OnCreateComplete(ctx context.Context, items []db.I
 	if len(input.InstanceSnapshotId) > 0 {
 		manager.SetPropertiesWithInstanceSnapshot(ctx, userCred, input.InstanceSnapshotId, items)
 	}
-	if len(input.InstanceGroupName) > 0 {
+	if len(input.InstanceGroupName) > 0 && !input.DryRun {
 		hostCount := 1
 		granularity := 1
 
@@ -2140,7 +2141,7 @@ func (manager *SGuestManager) OnCreateComplete(ctx context.Context, items []db.I
 		}
 
 		//create group
-		s := auth.GetAdminSession(ctx, options.Options.Region, "")
+		s := auth.GetAdminSession(ctx, options.Options.Region)
 		params := jsonutils.NewDict()
 		params.Add(jsonutils.NewString(input.InstanceGroupName), "name")
 		params.Add(jsonutils.JSONFalse, "force_dispersion")
@@ -2155,12 +2156,12 @@ func (manager *SGuestManager) OnCreateComplete(ctx context.Context, items []db.I
 		ret, err := modules.InstanceGroups.Create(s, params)
 		if err != nil {
 			log.Errorf("OnCreateComplete create group %s fail err %v", input.InstanceGroupName, err)
-		}
-
-		// input.GuestImageID maybe name of guestimage
-		if ret.Contains("id") {
-			id, _ := ret.GetString("id")
-			input.InstanceGroupIds = []string{id}
+		} else {
+			// input.GuestImageID maybe name of guestimage
+			if ret.Contains("id") {
+				id, _ := ret.GetString("id")
+				input.InstanceGroupIds = []string{id}
+			}
 		}
 	}
 	pendingUsage, pendingRegionUsage := getGuestResourceRequirements(ctx, userCred, input, ownerId, len(items), input.Backup)

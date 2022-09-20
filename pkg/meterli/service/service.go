@@ -21,9 +21,8 @@ import (
 	"time"
 	"yunion.io/x/onecloud/pkg/cloudcommon/cronman"
 
-	_ "github.com/go-sql-driver/mysql"
-
 	"yunion.io/x/log"
+	_ "yunion.io/x/sqlchemy/backends"
 
 	"yunion.io/x/onecloud/pkg/apis"
 	"yunion.io/x/onecloud/pkg/cloudcommon"
@@ -51,9 +50,11 @@ func StartService() {
 	})
 
 	app := app_common.InitApp(baseOpts, true)
-	initHandlers(app)
 
-	db.EnsureAppInitSyncDB(app, dbOpts, models.InitDB)
+	cloudcommon.InitDB(dbOpts)
+	InitHandlers(app)
+
+	db.EnsureAppSyncDB(app, dbOpts, models.InitDB)
 	defer cloudcommon.CloseDB()
 
 	//models.StartNotifyToWebsocketWorker()

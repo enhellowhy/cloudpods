@@ -20,9 +20,10 @@ import (
 
 // Here are all the errors that may appear in the preselection predicates.
 const (
-	ErrServerTypeIsNotMatch = `server type is not match`
-	ErrExitIsNotMatch       = `exit is not match`
-	ErrWireIsNotMatch       = `wire is not match`
+	ErrServerTypeIsNotMatch   = `server type is not match`
+	ErrInstanceTypeIsNotMatch = `instance type is not match`
+	ErrExitIsNotMatch         = `exit is not match`
+	ErrWireIsNotMatch         = `wire is not match`
 
 	ErrNoPorts               = `no ports`
 	ErrNotOwner              = `not owner`

@@ -28,10 +28,11 @@ func (opts *JumpServerNodeListOptions) Params() (jsonutils.JSONObject, error) {
 
 type JumpServerUserCreateOptions struct {
 	//Id       string   `json:"id" help:"Resource VM Id"`
-	Username string `json:"username" help:"Resource JS Name"`
-	Name     string `json:"name" help:"Resource JS Name"`
-	Email    string `json:"email" help:"Resource VM Email"`
-	Source   string `json:"source" help:"Resource VM source"`
+	Username    string   `json:"username" help:"Resource JS Name"`
+	Name        string   `json:"name" help:"Resource JS Name"`
+	Email       string   `json:"email" help:"Resource VM Email"`
+	Source      string   `json:"source" help:"Resource VM source"`
+	SystemRoles []string `json:"system_roles" help:"Resource JS SystemRoles"`
 	//Nodes    []string `json:"nodes" help:"Resource VM Nodes"`
 }
 

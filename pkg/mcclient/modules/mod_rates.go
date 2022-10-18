@@ -59,7 +59,7 @@ const (
 	FLAG_YES           = "YES"
 	FLAG_NO            = "NO"
 
-	CPU_MODEL  = "g1,c1"
+	CPU_MODEL  = "g1,c1,r1"
 	DISK_MODEL = "rotate::local,ssd::local,ssd::rbd,rotate::rbd,hybrid::rbd"
 )
 

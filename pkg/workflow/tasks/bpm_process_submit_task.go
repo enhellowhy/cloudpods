@@ -221,7 +221,17 @@ func (self *BpmProcessSubmitTask) getApplyDataSet(ctx context.Context, workflow 
 		log.Errorf("fail to fetch FetchServerCreateInputByJSON, %v", err)
 		return DataSet{}, err
 	}
-	pzgg = fmt.Sprintf("%s(通用型 %d核%dGB)", input.InstanceType, input.VcpuCount, input.VmemSize/1024)
+	instanceTypeFamily := strings.Split(input.InstanceType, ".")[1]
+	switch instanceTypeFamily {
+	case "g1":
+		pzgg = fmt.Sprintf("%s(通用型 %d核%dGB)", input.InstanceType, input.VcpuCount, input.VmemSize/1024)
+	case "c1":
+		pzgg = fmt.Sprintf("%s(计算优化型 %d核%dGB)", input.InstanceType, input.VcpuCount, input.VmemSize/1024)
+	case "r1":
+		pzgg = fmt.Sprintf("%s(内存优化型 %d核%dGB)", input.InstanceType, input.VcpuCount, input.VmemSize/1024)
+	default:
+		pzgg = fmt.Sprintf("%s(通用型 %d核%dGB)", input.InstanceType, input.VcpuCount, input.VmemSize/1024)
+	}
 	s := auth.GetAdminSession(ctx, options.Options.Region)
 
 	for _, disk := range input.Disks {

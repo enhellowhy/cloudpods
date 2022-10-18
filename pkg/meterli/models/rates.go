@@ -62,7 +62,7 @@ const (
 
 // no order
 var resMap = map[string]string{
-	"cpu":  "g1,c1",
+	"cpu":  "g1,c1,r1",
 	"mem":  "",
 	"disk": "rotate::local,ssd::local,ssd::rbd,rotate::rbd,hybrid::rbd",
 }
@@ -187,6 +187,8 @@ func (manager *SRateManager) InitializeData() error {
 					rate.PriceType = "amount"
 					if model == "c1" {
 						rate.Price = 0.001
+					} else if model == "r1" {
+						rate.Price = 0.002
 					} else {
 						rate.Price = 0.004
 					}

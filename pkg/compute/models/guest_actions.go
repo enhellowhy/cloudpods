@@ -5600,6 +5600,7 @@ func (self *SGuest) JoinJumpServer(ctx context.Context, userCred mcclient.TokenC
 		userCreateOptions.Name = emailPrefix
 		userCreateOptions.Email = email
 		userCreateOptions.Source = "ldap"
+		userCreateOptions.SystemRoles = []string{"00000000-0000-0000-0000-000000000003"}
 		userParams, _ := userCreateOptions.Params()
 		jsUser, err = thirdparty.JsAsset.CreateUser(s, userParams)
 		if err != nil {

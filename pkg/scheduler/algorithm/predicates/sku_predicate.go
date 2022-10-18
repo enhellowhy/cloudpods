@@ -17,6 +17,10 @@ package predicates
 import (
 	"context"
 	"fmt"
+	"strings"
+	"yunion.io/x/onecloud/pkg/apis"
+	"yunion.io/x/onecloud/pkg/apis/compute"
+	"yunion.io/x/onecloud/pkg/scheduler/cache/candidate"
 
 	"yunion.io/x/onecloud/pkg/scheduler/core"
 	skuman "yunion.io/x/onecloud/pkg/scheduler/data_manager/sku"
@@ -35,6 +39,10 @@ func (p *InstanceTypePredicate) Clone() core.FitPredicate {
 }
 
 func (p *InstanceTypePredicate) PreExecute(ctx context.Context, u *core.Unit, cs []core.Candidater) (bool, error) {
+	if u.SchedData().InstanceType != "" && u.GetHypervisor() == compute.HYPERVISOR_KVM {
+		return true, nil
+	}
+	//kvm driver sku filter false
 	if u.SchedData().InstanceType == "" || !u.GetHypervisorDriver().DoScheduleSKUFilter() {
 		return false, nil
 	}
@@ -54,6 +62,26 @@ func (p *InstanceTypePredicate) Execute(ctx context.Context, u *core.Unit, c cor
 
 	reqRegion := d.PreferRegion
 	reqZone := d.PreferZone
+
+	if u.GetHypervisor() == compute.HYPERVISOR_KVM {
+		instanceTypeFamily := strings.Split(instanceType, ".")[1]
+		hd := c.(*candidate.HostDesc)
+		familyMeta, find := hd.Metadata[apis.USER_TAG_PREFIX+"instance_type_families"]
+		if find {
+			families := strings.Split(familyMeta, ",")
+			for _, family := range families {
+				if family == instanceTypeFamily {
+					return h.GetResult()
+				}
+			}
+			h.Exclude2(ErrInstanceTypeIsNotMatch, familyMeta, instanceTypeFamily)
+		} else if instanceTypeFamily == "g1" {
+			//nothing
+		} else {
+			h.Exclude2(ErrInstanceTypeIsNotMatch, "g1", instanceTypeFamily)
+		}
+		return h.GetResult()
+	}
 
 	if reqRegion != "" && reqZone == "" {
 		skus := skuman.GetByRegion(instanceType, regionId)

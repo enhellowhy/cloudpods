@@ -285,14 +285,22 @@ func (self *GuestDeleteTask) OnPendingDeleteComplete(ctx context.Context, obj db
 	}
 	log.Infof("XXXXXX Zabbix user auth is %s", auth)
 	defer thirdparty.Zabbix.UserLogout(s, auth)
-	hostId, err := thirdparty.Zabbix.HostGet(s, auth, guest.Name, guest.GetRealIPs()[0])
+	hostId, err := thirdparty.Zabbix.HostGet(s, auth, guest.Hostname, guest.GetRealIPs()[0])
 	if err != nil {
 		log.Errorf("Zabbix get host failed: %v", err)
 		return
 	}
 	if hostId == "" {
-		log.Errorf("host does not exist in zabbix!")
-		return
+		log.Errorf("host %s does not exist in zabbix, try use guest name %s again.", guest.Hostname, guest.Name)
+		hostId, err = thirdparty.Zabbix.HostGet(s, auth, guest.Name, guest.GetRealIPs()[0])
+		if err != nil {
+			log.Errorf("Zabbix get host failed: %v", err)
+			return
+		}
+		if hostId == "" {
+			log.Errorf("host %s really does not exist in zabbix!!!", guest.Hostname)
+			return
+		}
 	}
 	_, err = thirdparty.Zabbix.HostDisable(s, auth, hostId)
 	if err != nil {
@@ -372,14 +380,22 @@ func (self *GuestDeleteTask) DoDeleteGuest(ctx context.Context, guest *models.SG
 	}
 	log.Infof("XXXXXX Zabbix user auth is %s", auth)
 	defer thirdparty.Zabbix.UserLogout(s, auth)
-	hostId, err := thirdparty.Zabbix.HostGet(s, auth, guest.Name, guest.GetRealIPs()[0])
+	hostId, err := thirdparty.Zabbix.HostGet(s, auth, guest.Hostname, guest.GetRealIPs()[0])
 	if err != nil {
 		log.Errorf("Zabbix get host failed: %v", err)
 		return
 	}
 	if hostId == "" {
-		log.Errorf("host does not exist in zabbix!")
-		return
+		log.Errorf("host %s does not exist in zabbix, try use guest name %s again.", guest.Hostname, guest.Name)
+		hostId, err = thirdparty.Zabbix.HostGet(s, auth, guest.Name, guest.GetRealIPs()[0])
+		if err != nil {
+			log.Errorf("Zabbix get host failed: %v", err)
+			return
+		}
+		if hostId == "" {
+			log.Errorf("host %s really does not exist in zabbix!!!", guest.Hostname)
+			return
+		}
 	}
 	_, err = thirdparty.Zabbix.HostDelete(s, auth, hostId)
 	if err != nil {

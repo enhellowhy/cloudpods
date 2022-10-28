@@ -62,9 +62,9 @@ func init() {
 type SIdmapping struct {
 	db.SResourceBase
 
-	PublicId    string `width:"64" charset:"ascii" nullable:"false" primary:"false"`
+	PublicId    string `width:"64" charset:"ascii" nullable:"false" primary:"true"`
 	IdpId       string `name:"domain_id" width:"64" charset:"ascii" nullable:"false" primary:"true"`
-	IdpEntityId string `name:"local_id" width:"128" charset:"utf8" nullable:"false" primary:"true"`
+	IdpEntityId string `name:"local_id" width:"128" charset:"utf8" nullable:"false" update:"admin" primary:"false"`
 	EntityType  string `width:"10" charset:"ascii" nullable:"false" primary:"true"`
 }
 

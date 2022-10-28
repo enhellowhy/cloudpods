@@ -67,6 +67,11 @@ type SKeystoneOptions struct {
 	NoPolicyViolationCheck bool `help:"do not check policy violation when modify or assign policy" default:"false"`
 
 	LdapSearchPageSize uint32 `help:"pagination size for LDAP search" default:"100"`
+
+	IDaasClientId     string `help:"idaas client id" json:"idaas_client_id"`
+	IDaasClientSecret string `help:"idaas client secret" json:"idaas_client_secret"`
+	IDaasAudience     string `help:"idaas audience" json:"idaas_audience"`
+	EnableIdmapping   bool   `help:"Enable idmapping" json:"enable_idmapping"`
 }
 
 var (

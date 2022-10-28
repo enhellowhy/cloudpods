@@ -1967,7 +1967,9 @@ func (s *SKVMGuestInstance) OnResumeSyncMetadataInfo() {
 		meta.Set("__hugepage", jsonutils.NewString("native"))
 	}
 	// not exactly
-	if !options.HostOptions.HostCpuPassthrough || s.getOsname() == OS_NAME_MACOS {
+	hostCpuPassthroughOption := options.HostOptions.HostCpuPassthroughOption
+	log.Infof("HostCpuPassthroughOption is %s in OnResumeSyncMetadataInfo", hostCpuPassthroughOption)
+	if hostCpuPassthroughOption == "disable" || (hostCpuPassthroughOption != "enable" && !options.HostOptions.HostCpuPassthrough) || s.getOsname() == OS_NAME_MACOS {
 		meta.Set("__cpu_mode", jsonutils.NewString(api.CPU_MODE_QEMU))
 	} else {
 		meta.Set("__cpu_mode", jsonutils.NewString(api.CPU_MODE_HOST))

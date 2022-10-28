@@ -17,7 +17,6 @@ package service
 import (
 	"context"
 	"database/sql"
-
 	"github.com/golang-plus/uuid"
 
 	"yunion.io/x/log"
@@ -135,4 +134,45 @@ func user2User(u *models.SUser) db.SUser {
 	ret.DomainId = u.DomainId
 	ret.Domain = u.GetDomain().Name
 	return ret
+}
+
+func keystoneUpdateIdmapping() error {
+	log.Infoln("keystone update Idmapping entity id.")
+	//get user list
+	q := models.UserManager.Query().Equals("is_system_account", 0)
+	rows, err := q.Rows()
+	if err != nil {
+		log.Errorf("keystone get user list error %s.", err)
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		item := models.SUser{}
+		err = q.Row2Struct(rows, &item)
+		if err != nil {
+			log.Errorf("keystone get user struct error %s.", err)
+			continue
+		}
+		//idmapping, err := models.IdmappingManager.FetchFirstEntity(item.Id, api.IdMappingEntityUser)
+		sq := models.IdmappingManager.Query().Equals("public_id", item.Id).Equals("entity_type", api.IdMappingEntityUser)
+		idMap := models.SIdmapping{}
+		idMap.SetModelManager(models.IdmappingManager, &idMap)
+		err = sq.First(&idMap)
+		if err != nil {
+			//if err != nil && err != sql.ErrNoRows {
+			log.Errorf("keystone get idMap %s error %s.", item.Id, err)
+			continue
+		}
+		// db.Update不能更新主键，所以修正IdpEntityId为非主键
+		diff, err := db.Update(&idMap, func() error {
+			idMap.IdpEntityId = item.Name
+			return nil
+		})
+		log.Infof("%s", diff)
+		if err != nil {
+			log.Errorf("keystone update idMap %s error %s.", idMap.PublicId, err)
+			continue
+		}
+	}
+	return nil
 }

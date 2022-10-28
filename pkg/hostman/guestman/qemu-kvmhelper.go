@@ -418,7 +418,16 @@ function nic_mtu() {
 	// inject cpu info
 	if s.IsKvmSupport() && !options.HostOptions.DisableKVM {
 		input.EnableKVM = true
-		input.HostCPUPassthrough = options.HostOptions.HostCpuPassthrough
+
+		hostCpuPassthroughOption := options.HostOptions.HostCpuPassthroughOption
+		log.Infof("HostCpuPassthroughOption is %s in generateStartScript", hostCpuPassthroughOption)
+		if hostCpuPassthroughOption == "disable" {
+			input.HostCPUPassthrough = false
+		} else if hostCpuPassthroughOption == "enable" {
+			input.HostCPUPassthrough = true
+		} else {
+			input.HostCPUPassthrough = options.HostOptions.HostCpuPassthrough
+		}
 		input.IsCPUIntel = sysutils.IsProcessorIntel()
 		input.IsCPUAMD = sysutils.IsProcessorAmd()
 		input.EnableNested = guestManager.GetHost().IsNestedVirtualization()

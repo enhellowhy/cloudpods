@@ -107,6 +107,14 @@ func StartService() {
 		}
 	}
 
+	if options.Options.EnableIdmapping {
+		// enable update Idmapping
+		err := keystoneUpdateIdmapping()
+		if err != nil {
+			panic(err)
+		}
+	}
+
 	go func() {
 		app_common.ServeForeverExtended(app, &opts.BaseOptions, options.Options.AdminPort, nil, false)
 	}()

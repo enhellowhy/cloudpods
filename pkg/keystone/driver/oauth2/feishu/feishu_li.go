@@ -17,8 +17,10 @@ package feishu
 import (
 	"context"
 	"database/sql"
+	"encoding/base64"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -27,15 +29,18 @@ import (
 	"yunion.io/x/onecloud/pkg/apis"
 	"yunion.io/x/onecloud/pkg/cloudcommon/db"
 	"yunion.io/x/onecloud/pkg/keystone/models"
+	"yunion.io/x/onecloud/pkg/keystone/options"
 	"yunion.io/x/pkg/errors"
 
+	"github.com/lestrrat-go/jwx/jwt"
 	"yunion.io/x/onecloud/pkg/util/httputils"
 )
 
 const (
 	//LiAuthUrl = "https://user-center-service-test.it.lixiangoa.com/feishu?callback="
-	LiAuthUrl = "https://user-center-api.lixiangoa.com/feishu?callback="
-	CoaUrl    = "https://coa-it.chehejia.com:9528"
+	IDaaSAuthUrl = `https://id.lixiang.com/api/auth?client_id=%s&audience=%s&scope=openid&response_type=code&redirect_uri=%s`
+	LiAuthUrl    = "https://user-center-api.lixiangoa.com/feishu?callback="
+	CoaUrl       = "https://coa-it.chehejia.com:9528"
 )
 
 func (drv *SFeishuOAuth2Driver) GetSsoRedirectUri(ctx context.Context, callbackUrl, state string) (string, error) {
@@ -44,13 +49,16 @@ func (drv *SFeishuOAuth2Driver) GetSsoRedirectUri(ctx context.Context, callbackU
 	//	"redirect_uri": callbackUrl,
 	//}
 	//urlStr := fmt.Sprintf("%s?%s", AuthUrl, jsonutils.Marshal(req).QueryString())
-	urlStr := fmt.Sprintf("%s%s", LiAuthUrl, callbackUrl)
+	//urlStr := fmt.Sprintf("%s%s", LiAuthUrl, callbackUrl)
+	urlStr := fmt.Sprintf(IDaaSAuthUrl, options.Options.IDaasClientId, options.Options.IDaasAudience, callbackUrl)
+	//log.Infoln(urlStr)
 	return urlStr, nil
 }
 
 const (
 	//LiAccessTokenUrl = "https://user-center-service-test.it.lixiangoa.com/token?code="
 	//LiUserInfoUrl    = "https://user-center-service-test.it.lixiangoa.com/api/user?token="
+	IDaaSIdTokenUrl  = "https://id.lixiang.com/api/token"
 	LiAccessTokenUrl = "https://user-center-api.lixiangoa.com/token?code="
 	LiUserInfoUrl    = "https://user-center-api.lixiangoa.com/api/user?token="
 )
@@ -68,6 +76,52 @@ func fetchLiAccessToken(ctx context.Context, code string) (*sAccessTokenData, er
 		return nil, errors.Wrap(err, "unmarshal")
 	}
 	return &data, nil
+}
+
+func fetchIDaaSIdToken(ctx context.Context, code string) (*sIDaaSIdTokenData, error) {
+	httpclient := httputils.GetDefaultClient()
+	header := http.Header{}
+	basicStr := options.Options.IDaasClientId + ":" + options.Options.IDaasClientSecret
+	basicEncoding := base64.StdEncoding.EncodeToString([]byte(basicStr))
+	header.Set("Authorization", "Basic "+basicEncoding)
+	header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	//body := jsonutils.NewDict()
+	//body.Set("code", jsonutils.NewString(code))
+	//body.Set("grant_type", jsonutils.NewString("authorization_code"))
+	//bodystr := body.String()
+
+	bodyValues := url.Values{}
+	bodyValues.Add("code", code)
+	bodyValues.Add("grant_type", "authorization_code")
+	body := bodyValues.Encode()
+
+	jbody := strings.NewReader(body)
+
+	resp, err := httputils.Request(httpclient, ctx, httputils.POST, IDaaSIdTokenUrl, header, jbody, true)
+	if err != nil {
+		return nil, errors.Wrap(err, "request idaas id token")
+	}
+	_, jsonResp, err := httputils.ParseJSONResponse(body, resp, err, true)
+	if err != nil {
+		return nil, errors.Wrap(err, "parse idaas id token response")
+	}
+	data := sIDaaSIdTokenData{}
+	err = jsonResp.Unmarshal(&data)
+	if err != nil {
+		return nil, errors.Wrap(err, "Unmarshal")
+	}
+	return &data, nil
+}
+
+type sIDaaSIdTokenData struct {
+	TokenType string `json:"token_type"`
+	IdToken   string `json:"id_token"`
+	ExpiresIn int64  `json:"expires_in"`
+}
+
+func parseIDaaSIdToken(ctx context.Context, idToken string) (jwt.Token, error) {
+	return jwt.ParseString(idToken)
 }
 
 type sLiUserInfoData struct {
@@ -120,9 +174,11 @@ func fetchOauthToken(ctx context.Context, body jsonutils.JSONObject) (*sOauthTok
 type sCoaUserInfoData struct {
 	Name         string `json:"name"`
 	DepartmentId int64  `json:"department_id"`
+	JobNumber    string `json:"job_number"`
 	Email        string `json:"email"`
 	UserName     string `json:"user_name"`
 	StaffId      int64  `json:"id"`
+	Avatar       string `json:"avatar"`
 }
 
 type sCoaDepInfoData struct {
@@ -233,13 +289,25 @@ func fetchProjectMetadata() (map[int64][]string, error) {
 }
 
 func (drv *SFeishuOAuth2Driver) Authenticate(ctx context.Context, code string) (map[string][]string, error) {
-	accessData, err := fetchLiAccessToken(ctx, code)
+	//accessData, err := fetchLiAccessToken(ctx, code)
+	//if err != nil {
+	//	return nil, errors.Wrap(err, "fetchAccessToken")
+	//}
+	//userInfo, err := fetchLiUserInfo(ctx, accessData.AccessToken)
+	//if err != nil {
+	//	return nil, errors.Wrap(err, "fetchUserInfo")
+	//}
+	tokenData, err := fetchIDaaSIdToken(ctx, code)
 	if err != nil {
-		return nil, errors.Wrap(err, "fetchAccessToken")
+		return nil, errors.Wrap(err, "fetchIDaaSIdToken")
 	}
-	userInfo, err := fetchLiUserInfo(ctx, accessData.AccessToken)
+	idToken, err := parseIDaaSIdToken(ctx, tokenData.IdToken)
 	if err != nil {
-		return nil, errors.Wrap(err, "fetchUserInfo")
+		return nil, errors.Wrap(err, "parseIDaaSIdToken")
+	}
+	staffId, find := idToken.Get("leg")
+	if !find {
+		return nil, fmt.Errorf("IDaaS id token can not find 'leg' of staff id.")
 	}
 	coaModel, err := models.ServiceManager.FetchByName(models.GetDefaultAdminCred(), apis.SERVICE_TYPE_COA)
 	if err != nil {
@@ -269,7 +337,12 @@ func (drv *SFeishuOAuth2Driver) Authenticate(ctx context.Context, code string) (
 	if err != nil {
 		return nil, errors.Wrap(err, "get oauth token")
 	}
-	emailPrefix := strings.Split(userInfo.Email, "@")[0]
+	//coaInfo, err := fetchCoaUserInfo(ctx, token, strconv.FormatInt(userInfo.StaffId, 10))
+	coaInfo, err := fetchCoaUserInfo(ctx, token, staffId.(string))
+	if err != nil {
+		return nil, errors.Wrap(err, "fetch coa user")
+	}
+	emailPrefix := strings.Split(coaInfo.Email, "@")[0]
 
 	admins, err := coaSvc.Extra.GetArray("Admins")
 	if err != nil {
@@ -289,10 +362,6 @@ func (drv *SFeishuOAuth2Driver) Authenticate(ctx context.Context, code string) (
 		}
 	}
 
-	coaInfo, err := fetchCoaUserInfo(ctx, token, strconv.FormatInt(userInfo.StaffId, 10))
-	if err != nil {
-		return nil, errors.Wrap(err, "fetch coa user")
-	}
 	coaDepInfo, err := fetchCoaDepartmentsInfo(ctx, token, strconv.FormatInt(coaInfo.DepartmentId, 10))
 	if err != nil {
 		return nil, errors.Wrap(err, "fetch coa deps")
@@ -322,13 +391,14 @@ func (drv *SFeishuOAuth2Driver) Authenticate(ctx context.Context, code string) (
 	}
 
 	//ret := make(map[string][]string)
-	ret["name"] = []string{userInfo.Name}
-	ret["user_id"] = []string{userInfo.UserID}
+	ret["name"] = []string{coaInfo.Name}
+	//ret["user_id"] = []string{coaInfo.JobNumber}
 	ret["name_en"] = []string{emailPrefix}
-	ret["email"] = []string{userInfo.Email}
-	ret["mobile"] = []string{userInfo.Mobile}
-	ret["avatar"] = []string{userInfo.AvatarURL}
-	ret["staff_id"] = []string{strconv.FormatInt(userInfo.StaffId, 10)}
+	ret["email"] = []string{coaInfo.Email}
+	ret["mobile"] = []string{"01234567890"}
+	ret["avatar"] = []string{coaInfo.Avatar}
+	//ret["staff_id"] = []string{strconv.FormatInt(userInfo.StaffId, 10)}
+	ret["staff_id"] = []string{staffId.(string)}
 	ret["project"] = projects
 	//ret["roles"] = []string{"project_viewer"}
 	//if len(projects) == 0 && isAdmin {

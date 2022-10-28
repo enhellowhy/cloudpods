@@ -189,6 +189,9 @@ type SHostOptions struct {
 	BinaryMemcleanPath string `help:"execute binary memclean path" default:"/opt/yunion/bin/memclean"`
 
 	MaxHotplugVCpuCount int `help:"maximal possible vCPU count that the platform kvm supports"`
+
+	//HostCpuPassthrough       bool   `default:"true" help:"if it is true, set qemu cpu type as -cpu host, otherwise, qemu64. default is true"`
+	HostCpuPassthroughOption string `help:"HostCpuPassthrough option: disable|common|enable|'' " default:"enable"`
 }
 
 var (

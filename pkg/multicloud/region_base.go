@@ -151,6 +151,10 @@ func (self *SRegion) CreateInternetGateway() (cloudprovider.ICloudInternetGatewa
 	return nil, errors.Wrapf(cloudprovider.ErrNotSupported, "CreateInternetGateway")
 }
 
+func (self *SRegion) GetICloudFiles(path, prefix, start string, limit int) ([]cloudprovider.ICloudFileSystem, bool, error) {
+	return nil, false, errors.Wrapf(cloudprovider.ErrNotImplemented, "GetICloudFiles")
+}
+
 func (self *SRegion) GetICloudFileSystems() ([]cloudprovider.ICloudFileSystem, error) {
 	return nil, errors.Wrapf(cloudprovider.ErrNotImplemented, "GetICloudFileSystems")
 }
@@ -237,6 +241,14 @@ func (self *SRegion) GetIDBInstanceSkus() ([]cloudprovider.ICloudDBInstanceSku, 
 
 func (self *SRegion) GetICloudNatSkus() ([]cloudprovider.ICloudNatSku, error) {
 	return nil, errors.Wrapf(cloudprovider.ErrNotImplemented, "GetICloudNatSkus")
+}
+
+func (self *SRegion) GetICloudNasSkus() ([]cloudprovider.ICloudNasSku, error) {
+	return nil, errors.Wrapf(cloudprovider.ErrNotImplemented, "GetICloudNasSkus")
+}
+
+func (self *SRegion) GetICloudNasSkusByProviderId(id string) ([]cloudprovider.ICloudNasSku, error) {
+	return nil, errors.Wrapf(cloudprovider.ErrNotImplemented, "GetICloudNasSkusByProviderId")
 }
 
 func (self *SRegion) GetICloudKubeClusters() ([]cloudprovider.ICloudKubeCluster, error) {

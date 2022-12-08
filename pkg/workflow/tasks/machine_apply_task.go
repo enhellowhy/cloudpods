@@ -122,7 +122,7 @@ func (self *MachineApplyTask) OnWaitGuestReady(ctx context.Context, session *mcc
 	// check all server's status
 	var waitLimit, waitinterval time.Duration
 	if input.Hypervisor == compute.HYPERVISOR_KVM {
-		waitLimit = 5 * time.Minute
+		waitLimit = 10 * time.Minute
 		waitinterval = 5 * time.Second
 	} else {
 		waitLimit = 10 * time.Minute

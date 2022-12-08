@@ -372,6 +372,8 @@ func (h *AuthHandlers) doCredentialLogin(ctx context.Context, req *http.Request,
 				return nil, err
 			}
 			switch httperr.Class {
+			case "UnauthorizedError":
+				return nil, httperrors.NewUnauthorizedError("unauthorized error")
 			case "UserNotFound", "WrongPassword":
 				return nil, httperrors.NewJsonClientError(httperrors.ErrIncorrectUsernameOrPassword, "incorrect username or password")
 			case "UserLocked":

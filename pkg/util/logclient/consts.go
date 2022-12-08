@@ -239,6 +239,7 @@ const (
 	ACT_BPM_SEND_APPLICATION     = "bpm_send_application"
 	ACT_BPM_APPLY_MACHINE        = "bpm_apply_machine"
 	ACT_BPM_APPLY_BUCKET         = "bpm_apply_bucket"
+	ACT_BPM_APPLY_FILESYSTEM     = "bpm_apply_filesystem"
 	ACT_BPM_APPLY_LOADBALANCER   = "bpm_apply_loadbalancer"
 	ACT_BPM_CHANGECONFIG_MACHINE = "bpm_changeconfig_machine"
 

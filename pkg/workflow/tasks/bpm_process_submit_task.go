@@ -174,6 +174,15 @@ func (self *BpmProcessSubmitTask) submitProcess(ctx context.Context, workflow *m
 			return nil, err
 		}
 		body.Set("data_set", jsonutils.Marshal(dataSet))
+	case modules.APPLY_FILESYSTEM:
+		body.Set("form_key", jsonutils.NewString("form_xuuj6kvorr"))
+		body.Set("process_key", jsonutils.NewString("li_filesystem_apply_ws7o1sdz"))
+		dataSet, err := self.getFileSystemApplyDataSet(ctx, workflow, departmentId, feishuUserId)
+		if err != nil {
+			self.taskFailed(ctx, workflow, "fail to get file system apply data set")
+			return nil, err
+		}
+		body.Set("data_set", jsonutils.Marshal(dataSet))
 	}
 
 	//var appId = "li_test_itxtzh"
@@ -205,10 +214,11 @@ func (self *BpmProcessSubmitTask) getApplyDataSet(ctx context.Context, workflow 
 	}
 
 	var diskSizeDesc, pzgg, os string
-	//diskBackendMap := map[string]string{
-	//	"local": "本地磁盘",
-	//	"rbd":   "Ceph RBD",
-	//}
+	diskBackendMap := map[string]string{
+		"local":  "本地磁盘",
+		"ssd":    "高性能SSD",
+		"hybrid": "高效云盘",
+	}
 	diskTypeMap := map[string]string{
 		"sys": "系统盘：",
 		//"data": "数据盘%d：",
@@ -233,6 +243,8 @@ func (self *BpmProcessSubmitTask) getApplyDataSet(ctx context.Context, workflow 
 		pzgg = fmt.Sprintf("%s(通用型 %d核%dGB)", input.InstanceType, input.VcpuCount, input.VmemSize/1024)
 	}
 	s := auth.GetAdminSession(ctx, options.Options.Region)
+	projectJson, _ := identity.Projects.GetById(s, input.ProjectId, nil)
+	projectName, _ := projectJson.GetString("name")
 
 	for _, disk := range input.Disks {
 		//if i == len(input.Disks)-1 {
@@ -240,7 +252,7 @@ func (self *BpmProcessSubmitTask) getApplyDataSet(ctx context.Context, workflow 
 		//} else {
 		//	diskSizeDesc += strconv.Itoa(disk.SizeMb/1024) + ","
 		//}
-		var prefix string
+		var prefix, backendDesc string
 		switch disk.DiskType {
 		case "sys":
 			prefix = diskTypeMap[disk.DiskType]
@@ -258,8 +270,17 @@ func (self *BpmProcessSubmitTask) getApplyDataSet(ctx context.Context, workflow 
 			//prefix = fmt.Sprintf(diskTypeMap[disk.DiskType], disk.Index)
 			prefix = diskTypeMap[disk.DiskType]
 		}
-		//diskSizeDesc += prefix + strconv.Itoa(disk.SizeMb/1024) + " GB(" + diskBackendMap[disk.Backend] + ")\n"
-		diskSizeDesc += prefix + strconv.Itoa(disk.SizeMb/1024) + " GB\n"
+
+		switch disk.Backend {
+		case "local":
+			backendDesc = diskBackendMap[disk.Backend]
+		case "rbd":
+			backendDesc = diskBackendMap[disk.Medium]
+		default:
+			backendDesc = "No match backend"
+		}
+		diskSizeDesc += prefix + strconv.Itoa(disk.SizeMb/1024) + " GB（" + backendDesc + "）\n"
+		//diskSizeDesc += prefix + strconv.Itoa(disk.SizeMb/1024) + " GB\n"
 	}
 	count = input.Count
 
@@ -276,6 +297,10 @@ func (self *BpmProcessSubmitTask) getApplyDataSet(ctx context.Context, workflow 
 			&CodeValue{
 				Code:  "czxt",
 				Value: os,
+			},
+			&CodeValue{
+				Code:  "xm",
+				Value: projectName,
 			},
 			&CodeValue{
 				Code:  "zylx",
@@ -669,6 +694,95 @@ func (self *BpmProcessSubmitTask) getLoadbalancerApplyDataSet(ctx context.Contex
 			},
 		},
 		DataCode: "li_app_3qedx9grhl_formtable_main_639",
+	}
+
+	return dataSet, nil
+}
+
+func getStorageType(s string) string {
+	switch s {
+	case compute.NAS_STORAGE_TYPE_STANDARD:
+		return "标准型"
+	case compute.NAS_STORAGE_TYPE_PERFORMANCE:
+		return "性能型"
+	case compute.NAS_STORAGE_TYPE_CAPACITY:
+		return "容量型"
+	}
+	return "-"
+}
+
+func (self *BpmProcessSubmitTask) getFileSystemApplyDataSet(ctx context.Context, workflow *models.SWorkflowProcessInstance, departmentId, feishuUserId string) (DataSet, error) {
+	params, err := jsonutils.ParseString(workflow.Setting)
+	if err != nil {
+		log.Errorf("fail to parse workflow setting, %v", err)
+		return DataSet{}, err
+	}
+
+	count := 1
+
+	input := new(compute.FileSystemCreateInput)
+	err = params.Unmarshal(input)
+	if err != nil {
+		log.Errorf("fail to unmarshal FileSystemCreateInput %v", err)
+		return DataSet{}, err
+	}
+
+	s := auth.GetAdminSession(ctx, options.Options.Region)
+	projectJson, _ := identity.Projects.GetById(s, input.ProjectId, nil)
+	projectName, _ := projectJson.GetString("name")
+
+	dataSet := DataSet{
+		Values: []*CodeValue{
+			&CodeValue{
+				Code:  "ywbm",
+				Value: workflow.Id,
+			},
+			&CodeValue{
+				Code:  "zylx",
+				Value: modules.WorkflowProcessDefinitionsMap[workflow.Type],
+			},
+			&CodeValue{
+				Code:  "wjxtmc",
+				Value: input.Name,
+			},
+			&CodeValue{
+				Code:  "xylx",
+				Value: input.Protocol,
+			},
+			&CodeValue{
+				Code:  "rlpe",
+				Value: getSizeStr(input.Capacity * (1024 * 1024 * 1024)),
+			},
+			&CodeValue{
+				Code:  "cclx",
+				Value: getStorageType(input.StorageType),
+			},
+			&CodeValue{
+				Code:  "xm",
+				Value: projectName,
+			},
+			&CodeValue{
+				Code:  "sl",
+				Value: strconv.Itoa(count),
+			},
+			&CodeValue{
+				Code:  "sqr",
+				Value: feishuUserId,
+			},
+			&CodeValue{
+				Code:  "sqbm",
+				Value: departmentId,
+			},
+			&CodeValue{
+				Code:  "sqsj",
+				Value: workflow.CreatedAt.Local().Format("2006-01-02 15:04:05"),
+			},
+			&CodeValue{
+				Code:  "sqyy",
+				Value: workflow.Description,
+			},
+		},
+		DataCode: "li_app_3qedx9grhl_main_640_rksqykmz",
 	}
 
 	return dataSet, nil

@@ -18,8 +18,8 @@ import (
 	"context"
 	"fmt"
 	"time"
-
 	"yunion.io/x/log"
+	"yunion.io/x/onecloud/pkg/multicloud/nas/xgfs"
 	"yunion.io/x/pkg/errors"
 	"yunion.io/x/pkg/util/compare"
 	"yunion.io/x/pkg/utils"
@@ -337,9 +337,33 @@ func syncRegionFileSystems(ctx context.Context, userCred mcclient.TokenCredentia
 				return
 			}
 
-			syncFileSystemMountTargets(ctx, userCred, &localFSs[j], removeFSs[j])
+			if remoteRegion.GetProvider() == api.CLOUD_PROVIDER_XGFS {
+				syncFileSystemMountTargetAcls(ctx, userCred, &localFSs[j], removeFSs[j])
+			} else {
+				syncFileSystemMountTargets(ctx, userCred, &localFSs[j], removeFSs[j])
+			}
 		}()
 	}
+}
+
+func syncFileSystemMountTargetAcls(ctx context.Context, userCred mcclient.TokenCredential, localFs *SFileSystem, remoteFs cloudprovider.ICloudFileSystem) {
+	mountTargets, err := remoteFs.GetMountTargets()
+	if err != nil {
+		log.Errorf("GetMountTargets for %s error: %v", localFs.Name, err)
+		return
+	}
+	if len(mountTargets) == 0 {
+		log.Debugf("no mount targets for %s to sync acls", localFs.Name)
+		return
+	}
+	shareId := mountTargets[0].(*xgfs.SDfsNfsShare).GetId()
+	acls, err := remoteFs.(*xgfs.SXgfsFileSystem).GetMountTargetAcls(shareId)
+	if err != nil {
+		log.Errorf("GetMountTargetAcls for %s error: %v", localFs.Name, err)
+		return
+	}
+	result := localFs.SyncMountTargetAcls(ctx, userCred, acls)
+	log.Infof("SyncMountTargetAcls for FileSystem %s result: %s", localFs.Name, result.Result())
 }
 
 func syncFileSystemMountTargets(ctx context.Context, userCred mcclient.TokenCredential, localFs *SFileSystem, remoteFs cloudprovider.ICloudFileSystem) {
@@ -1120,8 +1144,36 @@ func syncNATSkus(ctx context.Context, userCred mcclient.TokenCredential, syncRes
 		return
 	}
 	result := func() compare.SyncResult {
-		defer syncResults.AddSqlCost(DBInstanceSkuManager)()
+		defer syncResults.AddSqlCost(NatSkuManager)()
 		return localRegion.SyncPrivateCloudNatSkus(ctx, userCred, skus)
+	}()
+
+	syncResults.Add(NatSkuManager, result)
+
+	msg := result.Result()
+	log.Infof("SyncNatSkus for region %s result: %s", localRegion.Name, msg)
+	if result.IsError() {
+		return
+	}
+}
+
+func syncNasSkus(ctx context.Context, userCred mcclient.TokenCredential, syncResults SSyncResultSet, provider *SCloudprovider, localRegion *SCloudregion, remoteRegion cloudprovider.ICloudRegion, syncRange *SSyncRange) {
+	skus, err := func() ([]cloudprovider.ICloudNasSku, error) {
+		defer syncResults.AddRequestCost(NasSkuManager)()
+		//return remoteRegion.GetICloudNasSkus()
+		return remoteRegion.GetICloudNasSkusByProviderId(provider.GetId())
+	}()
+	if err != nil {
+		if errors.Cause(err) == cloudprovider.ErrNotImplemented {
+			return
+		}
+		msg := fmt.Sprintf("GetINasSkus for region %s failed %s", remoteRegion.GetName(), err)
+		log.Errorf(msg)
+		return
+	}
+	result := func() compare.SyncResult {
+		defer syncResults.AddSqlCost(NasSkuManager)()
+		return localRegion.SyncPrivateCloudNasSkus(ctx, userCred, skus, provider.GetId())
 	}()
 
 	syncResults.Add(NasSkuManager, result)
@@ -2040,6 +2092,12 @@ func syncOnPremiseCloudProviderInfo(
 			log.Infof("syncCloudImages for stroagecache %s result: %s", storageCachePairs[i].local.GetId(), msg)
 			// }
 		}
+	}
+
+	if cloudprovider.IsSupportNAS(driver) && syncRange.NeedSyncResource(cloudprovider.CLOUD_CAPABILITY_NAS) {
+		//syncRegionAccessGroups(ctx, userCred, syncResults, provider, localRegion, iregion, syncRange)
+		syncRegionFileSystems(ctx, userCred, syncResults, provider, localRegion, iregion, syncRange)
+		syncNasSkus(ctx, userCred, syncResults, provider, localRegion, iregion, syncRange)
 	}
 
 	return nil

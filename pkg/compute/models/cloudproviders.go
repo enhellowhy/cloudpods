@@ -1451,6 +1451,7 @@ func (self *SCloudprovider) RealDelete(ctx context.Context, userCred mcclient.To
 		ElasticcacheManager,
 		AccessGroupCacheManager,
 		FileSystemManager,
+		NasSkuManager,
 		WafRuleGroupCacheManager,
 		WafIPSetCacheManager,
 		WafRegexSetCacheManager,

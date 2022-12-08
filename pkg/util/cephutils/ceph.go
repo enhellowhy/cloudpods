@@ -173,16 +173,17 @@ func (self *CephClient) GetCapacity() (*SCapacity, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "ret.Unmarshal")
 	}
-	result.CapacitySizeKb = stats.Stats.TotalBytes / 1024
+	//result.CapacitySizeKb = stats.Stats.TotalBytes / 1024
+	result.CapacitySizeKb = stats.Stats.TotalAvailBytes / 1024
 	result.UsedCapacitySizeKb = stats.Stats.TotalUsedBytes / 1024
-	for _, pool := range stats.Pools {
-		if pool.Name == self.pool {
-			result.UsedCapacitySizeKb = int64(pool.Stats.Stored / 1024)
-			if pool.Stats.MaxAvail > 0 {
-				result.CapacitySizeKb = int64(pool.Stats.MaxAvail/1024 + int64(pool.Stats.Stored/1024))
-			}
-		}
-	}
+	//for _, pool := range stats.Pools {
+	//	if pool.Name == self.pool {
+	//		result.UsedCapacitySizeKb = int64(pool.Stats.Stored / 1024)
+	//		if pool.Stats.MaxAvail > 0 {
+	//			result.CapacitySizeKb = int64(pool.Stats.MaxAvail/1024 + int64(pool.Stats.Stored/1024))
+	//		}
+	//	}
+	//}
 	if result.CapacitySizeKb == 0 {
 		log.Warningf("cluster size is zero, output is: %s", resp)
 	}

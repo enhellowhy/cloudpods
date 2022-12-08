@@ -795,6 +795,11 @@ func fetchByManagerId(manager db.IModelManager, providerId string, receiver inte
 	return db.FetchModelObjects(manager, q, receiver)
 }
 
+func fetchByExternalId(manager db.IModelManager, providerId string, receiver interface{}) error {
+	q := manager.Query().Equals("external_id", providerId)
+	return db.FetchModelObjects(manager, q, receiver)
+}
+
 func fetchByVpcManagerId(manager db.IModelManager, providerId string, receiver interface{}) error {
 	vpc := VpcManager.Query().SubQuery()
 	q := manager.Query()

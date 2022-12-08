@@ -442,6 +442,8 @@ func (self *SMountTarget) SyncWithMountTarget(ctx context.Context, userCred mccl
 		self.Name = m.GetName()
 		self.DomainName = m.GetDomainName()
 		self.ExternalId = m.GetGlobalId()
+		self.VpcId = m.GetVpcId()
+		self.NetworkId = m.GetNetworkId()
 		if groupId := m.GetAccessGroupId(); len(groupId) > 0 {
 			_cache, _ := db.FetchByExternalIdAndManagerId(AccessGroupCacheManager, groupId, func(q *sqlchemy.SQuery) *sqlchemy.SQuery {
 				return q.Equals("manager_id", managerId)
@@ -490,6 +492,9 @@ func (self *SFileSystem) newFromCloudMountTarget(ctx context.Context, userCred m
 				mount.NetworkId = network.GetId()
 			}
 		}
+	} else if mount.NetworkType == api.NETWORK_TYPE_CLASSIC {
+		mount.VpcId = m.GetVpcId()
+		mount.NetworkId = m.GetNetworkId()
 	}
 
 	return MountTargetManager.TableSpec().Insert(ctx, mount)

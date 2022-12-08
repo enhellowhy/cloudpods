@@ -55,7 +55,7 @@ var (
 		"natgateways",
 		"natsentries",
 		"natdentries",
-		"file_systems",
+		//"file_systems",
 		"access_groups",
 		"access_group_caches",
 		"policy_assignments",

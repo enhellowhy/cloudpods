@@ -19,6 +19,7 @@ import "yunion.io/x/onecloud/pkg/mcclient/modulebase"
 const (
 	APPLY_MACHINE             = "apply-machine"
 	APPLY_BUCKET              = "apply-bucket"
+	APPLY_FILESYSTEM          = "apply-filesystem"
 	APPLY_LOADBALANCER        = "apply-loadbalancer"
 	APPLY_SERVER_CHANGECONFIG = "apply-server-changeconfig"
 	APPLY_SERVER_DELETE       = "apply-server-delete"
@@ -29,6 +30,7 @@ var (
 	WorkflowProcessDefinitionsMap = map[string]string{
 		APPLY_MACHINE:      "主机申请",
 		APPLY_BUCKET:       "存储桶申请",
+		APPLY_FILESYSTEM:   "文件系统申请",
 		APPLY_LOADBALANCER: "负载均衡申请",
 		//APPLY_SERVER_CHANGECONFIG: "主机变配",
 		APPLY_SERVER_CHANGECONFIG: "主机调整配置",

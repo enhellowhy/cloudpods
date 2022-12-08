@@ -280,7 +280,7 @@ func (manager *SWorkflowProcessInstanceManager) FetchCustomizeColumns(
 		switch instance.Key {
 		case modules.APPLY_MACHINE:
 			variables.ServerCreateParameter = instance.Setting
-		case modules.APPLY_SERVER_CHANGECONFIG, modules.APPLY_BUCKET, modules.APPLY_LOADBALANCER:
+		case modules.APPLY_SERVER_CHANGECONFIG, modules.APPLY_BUCKET, modules.APPLY_FILESYSTEM, modules.APPLY_LOADBALANCER:
 			variables.Parameter = instance.Setting
 		}
 
@@ -339,7 +339,7 @@ func (instance *SWorkflowProcessInstance) CustomizeCreate(ctx context.Context, u
 	switch input.ProcessDefinitionKey {
 	case modules.APPLY_MACHINE:
 		instance.Setting = input.ServerCreateParameter
-	case modules.APPLY_SERVER_CHANGECONFIG, modules.APPLY_BUCKET, modules.APPLY_LOADBALANCER:
+	case modules.APPLY_SERVER_CHANGECONFIG, modules.APPLY_BUCKET, modules.APPLY_FILESYSTEM, modules.APPLY_LOADBALANCER:
 		instance.Setting = input.Parameter
 	}
 	instance.Ids = input.Ids
@@ -429,6 +429,21 @@ func (instance *SWorkflowProcessInstance) PerformApprove(ctx context.Context, us
 		err = instance.StartBucketApplyTask(ctx, userCred)
 		if err != nil {
 			return nil, errors.Wrap(err, "Workflow.PerformApprove BucketApplyTask")
+		}
+	case modules.APPLY_FILESYSTEM:
+		diff, err := db.Update(instance, func() error {
+			instance.AuditStatus = AUDIT_APPROVED
+			instance.State = CREATING
+			return nil
+		})
+		if err != nil {
+			return nil, errors.Wrap(err, "Workflow.PerformApprove FileSystemApplyTask")
+		}
+		instance.SetStatus(userCred, api.WORKFLOW_INSTANCE_STATUS_OPERATING, "")
+		db.OpsLog.LogEvent(instance, db.ACT_UPDATE, diff, userCred)
+		err = instance.StartFileSystemApplyTask(ctx, userCred)
+		if err != nil {
+			return nil, errors.Wrap(err, "Workflow.PerformApprove FileSystemApplyTask")
 		}
 	case modules.APPLY_LOADBALANCER:
 		diff, err := db.Update(instance, func() error {
@@ -554,6 +569,15 @@ func (instance *SWorkflowProcessInstance) StartMachineApplyRetryTask(ctx context
 
 func (instance *SWorkflowProcessInstance) StartBucketApplyTask(ctx context.Context, userCred mcclient.TokenCredential) error {
 	task, err := taskman.TaskManager.NewTask(ctx, "BucketApplyTask", instance, userCred, nil, "", "")
+	if err != nil {
+		return err
+	}
+	task.ScheduleRun(nil)
+	return nil
+}
+
+func (instance *SWorkflowProcessInstance) StartFileSystemApplyTask(ctx context.Context, userCred mcclient.TokenCredential) error {
+	task, err := taskman.TaskManager.NewTask(ctx, "FileSystemApplyTask", instance, userCred, nil, "", "")
 	if err != nil {
 		return err
 	}

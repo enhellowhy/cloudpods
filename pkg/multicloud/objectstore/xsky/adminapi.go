@@ -120,7 +120,7 @@ func (manager *sManagerDelegate) getCacheS3LbGroup() (*sS3LbGroupResponse, error
 }
 
 func (manager *sManagerDelegate) setCacheS3LbGroup(group *sS3LbGroupResponse) {
-	manager.keys.AtomicSet("s3_load_balancer_groups", group)
+	manager.s3LbGroup.AtomicSet("s3_load_balancer_groups", group)
 }
 
 type SXskyAdminApi struct {

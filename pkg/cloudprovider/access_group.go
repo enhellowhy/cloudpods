@@ -39,6 +39,7 @@ const (
 	RWAccessTypeR  = TRWAccessType("R")
 
 	UserAccessTypeNoRootSquash = TUserAccessType("no_root_squash")
+	UserAccessTypeNoAllSquash  = TUserAccessType("no_all_squash")
 	UserAccessTypeRootSquash   = TUserAccessType("root_squash")
 	UserAccessTypeAllSquash    = TUserAccessType("all_squash")
 )

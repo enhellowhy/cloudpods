@@ -1974,6 +1974,30 @@ func (manager *SFileSystemManager) purgeAll(ctx context.Context, userCred mcclie
 	return nil
 }
 
+func (self *SNasSku) purge(ctx context.Context, userCred mcclient.TokenCredential) error {
+	lockman.LockObject(ctx, self)
+	defer lockman.ReleaseObject(ctx, self)
+
+	return self.RealDelete(ctx, userCred)
+}
+
+func (manager *SNasSkuManager) purgeAll(ctx context.Context, userCred mcclient.TokenCredential, providerId string) error {
+	skus := []SNasSku{}
+	err := fetchByExternalId(manager, providerId, &skus)
+	if err != nil {
+		return errors.Wrapf(err, "fetchByExternalId")
+	}
+
+	for i := range skus {
+		err := skus[i].purge(ctx, userCred)
+		if err != nil {
+			return errors.Wrapf(err, "cache purge")
+		}
+	}
+
+	return nil
+}
+
 func (vpcPC *SVpcPeeringConnection) purge(ctx context.Context, userCred mcclient.TokenCredential) error {
 	lockman.LockObject(ctx, vpcPC)
 	defer lockman.ReleaseObject(ctx, vpcPC)

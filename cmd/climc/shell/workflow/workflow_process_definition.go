@@ -26,7 +26,7 @@ func init() {
 	 * 创建指定类型的流程定义
 	 */
 	type ProcessDefinitionCreateOptions struct {
-		Type string `help:"definition type" required:"true" choices:"apply-machine|apply-server-changeconfig|apply-bucket|apply-loadbalancer"`
+		Type string `help:"definition type" required:"true" choices:"apply-machine|apply-server-changeconfig|apply-bucket|apply-filesystem|apply-loadbalancer"`
 	}
 	R(&ProcessDefinitionCreateOptions{}, "workflow-process-definition-create", "Create process definition",
 		func(s *mcclient.ClientSession, args *ProcessDefinitionCreateOptions) error {

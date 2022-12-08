@@ -369,7 +369,7 @@ func (self *SCloudregion) SyncPrivateCloudNatSkus(ctx context.Context, userCred 
 }
 
 func (self *SCloudregion) newFromPrivateCloudNatSku(ctx context.Context, userCred mcclient.TokenCredential, ext cloudprovider.ICloudNatSku) error {
-	sku := &SNasSku{}
+	sku := &SNatSku{}
 	sku.SetModelManager(NatSkuManager, sku)
 	sku.Name = ext.GetName()
 	sku.Description = ext.GetDesc()

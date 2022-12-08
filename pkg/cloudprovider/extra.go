@@ -24,3 +24,10 @@ type SCtyunExtraOptions struct {
 	// customInfo type=2
 	// OptionsAccountId string `help:"ctyun account id." json:"options_account_id"`
 }
+
+type SXskyExtraOptions struct {
+	SyncOnly              bool   `help:"xsky sync_only type for xgfs" json:"sync_only"`
+	XmsAuthToken          string `help:"xsky xms auth token" json:"xms_auth_token" default:"$XMS_AUTH_TOKEN"`
+	StorageType           string `help:"xsky storage type for xgfs" json:"storage_type" default:"standard"`
+	MountTargetDomainName string `help:"xsky domain name for xgfs" json:"mount_target_domain_name" default:"$MOUNT_TARGET_DOMAIN_NAME"`
+}

@@ -131,6 +131,8 @@ type ICloudRegion interface {
 	CreateISku(opts *SServerSkuCreateOption) (ICloudSku, error)
 
 	GetICloudNatSkus() ([]ICloudNatSku, error)
+	GetICloudNasSkus() ([]ICloudNasSku, error)
+	GetICloudNasSkusByProviderId(id string) ([]ICloudNasSku, error)
 
 	GetINetworkInterfaces() ([]ICloudNetworkInterface, error)
 
@@ -162,6 +164,7 @@ type ICloudRegion interface {
 
 	GetICloudQuotas() ([]ICloudQuota, error)
 
+	GetICloudFiles(path, prefix, start string, limit int) ([]ICloudFileSystem, bool, error)
 	GetICloudFileSystems() ([]ICloudFileSystem, error)
 	GetICloudFileSystemById(id string) (ICloudFileSystem, error)
 
@@ -1330,17 +1333,26 @@ type ICloudFileSystem interface {
 	ICloudResource
 	IBillingResource
 
+	GetProjectId() string
 	GetFileSystemType() string
 	GetStorageType() string
 	GetProtocol() string
 	GetCapacityGb() int64
 	GetUsedCapacityGb() int64
+	GetFileCount() int64
+	GetFileQuota() int64
+	GetLastModified() time.Time
+	IsShared() bool
+	GetPath() string
 	GetMountTargetCountLimit() int
 
 	GetZoneId() string
 
 	GetMountTargets() ([]ICloudMountTarget, error)
 	CreateMountTarget(opts *SMountTargetCreateOptions) (ICloudMountTarget, error)
+
+	//GetMountTargetAcls() ([]ICloudMountTargetAcl, error)
+	//CreateMountTargetAcl(opts *SNfsShareAclAddOptions) (ICloudMountTargetAcl, error)
 
 	Delete() error
 }
@@ -1354,6 +1366,19 @@ type ICloudMountTarget interface {
 	GetVpcId() string
 	GetNetworkId() string
 	GetStatus() string
+
+	Delete() error
+}
+
+type ICloudMountTargetAcl interface {
+	GetGlobalId() string
+	GetName() string
+	GetRWAccessType() TRWAccessType
+	GetUserAccessType() TUserAccessType
+	GetRootUserAccessType() TUserAccessType
+	GetSource() string
+	GetStatus() string
+	GetSync() bool
 
 	Delete() error
 }
@@ -1550,6 +1575,23 @@ type ICloudNatSku interface {
 	GetGlobalId() string
 	GetPrepaidStatus() string
 	GetPostpaidStatus() string
+}
+
+type ICloudNasSku interface {
+	GetName() string
+	GetDesc() string
+	GetGlobalId() string
+	GetProvider() string
+	GetPrepaidStatus() string
+	GetPostpaidStatus() string
+	GetStorageType() string
+	GetNetworkTypes() string
+	GetFileSystemType() string
+	GetDiskSizeStep() int
+	GetMaxDiskSizeGb() int
+	GetMinDiskSizeGb() int
+	GetProtocol() string
+	//GetSyncOnly() bool
 }
 
 type ICloudCDNDomain interface {

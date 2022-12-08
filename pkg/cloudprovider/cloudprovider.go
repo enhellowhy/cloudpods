@@ -107,6 +107,9 @@ type SCloudaccountCredential struct {
 
 	// ctyun crm account extra info
 	*SCtyunExtraOptions
+
+	// xsky xms api token extra info
+	*SXskyExtraOptions
 }
 
 type SCloudaccount struct {

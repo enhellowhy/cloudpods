@@ -14,7 +14,10 @@
 
 package cloudprovider
 
-import "yunion.io/x/onecloud/pkg/util/billing"
+import (
+	"time"
+	"yunion.io/x/onecloud/pkg/util/billing"
+)
 
 type FileSystemCraeteOptions struct {
 	Name           string
@@ -28,4 +31,24 @@ type FileSystemCraeteOptions struct {
 	ZoneId         string
 
 	BillingCycle *billing.SBillingCycle
+}
+
+type SCloudFile struct {
+	Name         string
+	Path         string
+	SizeBytes    int64
+	LastModified time.Time
+	Files        int64
+	Shared       bool
+}
+
+func ICloudFile2Struct(file ICloudFileSystem) SCloudFile {
+	return SCloudFile{
+		Name:         file.GetName(),
+		SizeBytes:    file.GetUsedCapacityGb(),
+		Files:        file.GetFileCount(),
+		Shared:       file.IsShared(),
+		Path:         file.GetPath(),
+		LastModified: file.GetLastModified(),
+	}
 }

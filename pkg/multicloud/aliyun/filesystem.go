@@ -64,6 +64,8 @@ type SFileSystem struct {
 	MeteredSize          int64
 	EncryptType          int
 	Capacity             int64
+	Files                int64
+	FileQuota            int64
 	ProtocolType         string
 	ChargeType           string
 	Packages             Packages
@@ -71,6 +73,22 @@ type SFileSystem struct {
 	FileSystemType       string
 	FileSystemId         string
 	RegionId             string
+}
+
+func (self *SFileSystem) GetProjectId() string {
+	return ""
+}
+
+func (self *SFileSystem) GetPath() string {
+	return ""
+}
+
+func (self *SFileSystem) IsShared() bool {
+	return false
+}
+
+func (self *SFileSystem) GetLastModified() time.Time {
+	return time.Now()
 }
 
 func (self *SFileSystem) GetId() string {
@@ -132,6 +150,14 @@ func (self *SFileSystem) GetCapacityGb() int64 {
 
 func (self *SFileSystem) GetUsedCapacityGb() int64 {
 	return self.MeteredSize
+}
+
+func (self *SFileSystem) GetFileQuota() int64 {
+	return self.FileQuota
+}
+
+func (self *SFileSystem) GetFileCount() int64 {
+	return self.Files
 }
 
 func (self *SFileSystem) GetZoneId() string {

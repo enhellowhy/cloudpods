@@ -16,6 +16,7 @@ package compute
 
 import (
 	"time"
+	"yunion.io/x/onecloud/pkg/cloudprovider"
 
 	"yunion.io/x/onecloud/pkg/apis"
 )
@@ -29,20 +30,30 @@ const (
 	NAS_STATUS_EXTENDING = "extending"
 	// 创建中
 	NAS_STATUS_CREATING = "creating"
+	// 权限添加中
+	NAS_ACL_STATUS_ADDING = "acl_adding"
 	// 创建失败
 	NAS_STATUS_CREATE_FAILED = "create_failed"
 	// 未知
 	NAS_STATUS_UNKNOWN = "unknown"
 	// 删除中
-	NAS_STATUS_DELETING      = "deleting"
+	NAS_STATUS_DELETING = "deleting"
+	// 权限删除中
+	NAS_ACL_STATUS_DELETING  = "acl_deleting"
 	NAS_STATUS_DELETE_FAILED = "delete_failed"
+
+	// storage type
+	NAS_STORAGE_TYPE_STANDARD    = "standard"
+	NAS_STORAGE_TYPE_PERFORMANCE = "performance"
+	NAS_STORAGE_TYPE_CAPACITY    = "capacity"
 
 	NAS_UPDATE_TAGS        = "update_tags"
 	NAS_UPDATE_TAGS_FAILED = "update_tags_fail"
 )
 
 type FileSystemListInput struct {
-	apis.StatusInfrasResourceBaseListInput
+	//apis.StatusInfrasResourceBaseListInput
+	apis.SharableVirtualResourceListInput
 	apis.ExternalizedResourceBaseListInput
 	ManagedResourceListInput
 
@@ -50,7 +61,8 @@ type FileSystemListInput struct {
 }
 
 type FileSystemCreateInput struct {
-	apis.StatusInfrasResourceBaseCreateInput
+	//apis.StatusInfrasResourceBaseCreateInput
+	apis.SharableVirtualResourceCreateInput
 	// 协议类型
 	// enum: NFS, SMB, CPFS
 	Protocol string `json:"protocol"`
@@ -58,6 +70,10 @@ type FileSystemCreateInput struct {
 	// 文件系统类型
 	// enmu: extreme, standard, cpfs
 	FileSystemType string `json:"file_system_type"`
+
+	// 云环境
+	// enmu: onpremise, public
+	CloudEnv string `json:"cloud_env"`
 
 	// 容量大小
 	Capacity int64 `json:"capacity"`
@@ -99,16 +115,42 @@ type FileSystemSyncstatusInput struct {
 }
 
 type FileSystemDetails struct {
-	apis.StatusInfrasResourceBaseDetails
+	//apis.StatusInfrasResourceBaseDetails
+	apis.SharableVirtualResourceDetails
 	ManagedResourceInfo
 	CloudregionResourceInfo
 
-	Vpc     string
-	Network string
-	Zone    string
+	Vpc                   string
+	Network               string
+	MountTargetDomainName string
+	Zone                  string
 }
 
 type FileSystemRemoteUpdateInput struct {
 	// 是否覆盖替换所有标签
 	ReplaceTags *bool `json:"replace_tags" help:"replace all remote tags"`
+}
+
+type FileSystemGetFilesInput struct {
+	// Prefix
+	Prefix string `json:"prefix"`
+	// Prefix
+	Path string `json:"path"`
+	// 分页标识
+	PagingMarker string `json:"paging_marker"`
+	// 最大输出条目数
+	Limit *int `json:"limit"`
+}
+
+type FileSystemGetFilesOutput struct {
+	// 对象列表
+	Data []cloudprovider.SCloudFile `json:"data"`
+	// 排序字段，总是name
+	// example: name
+	MarkerField string `json:"marker_field"`
+	// 排序顺序，总是降序
+	// example: ASC
+	MarkerOrder string `json:"marker_order"`
+	// 下一页请求的paging_marker标识
+	NextMarker string `json:"next_marker"`
 }

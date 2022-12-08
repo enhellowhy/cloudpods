@@ -5662,22 +5662,30 @@ func (self *SGuest) JoinJumpServer(ctx context.Context, userCred mcclient.TokenC
 		permUpdateOptions.Assets = append(permUpdateOptions.Assets, ret.Assets...)
 		permUpdateOptions.Users = make([]string, 0)
 		permUpdateOptions.Users = append(permUpdateOptions.Users, ret.Users...)
-		for i, id := range permUpdateOptions.Assets {
-			if id == assetID {
-				log.Infof("jumpserver asset perms %s have added for asset %s", permName, assetID)
-				break
-			}
-			if i == len(permUpdateOptions.Assets)-1 {
-				permUpdateOptions.Assets = append(permUpdateOptions.Assets, assetID)
+		if len(permUpdateOptions.Assets) == 0 {
+			permUpdateOptions.Assets = append(permUpdateOptions.Assets, assetID)
+		} else {
+			for i, id := range permUpdateOptions.Assets {
+				if id == assetID {
+					log.Infof("jumpserver asset perms %s have added for asset %s", permName, assetID)
+					break
+				}
+				if i == len(permUpdateOptions.Assets)-1 {
+					permUpdateOptions.Assets = append(permUpdateOptions.Assets, assetID)
+				}
 			}
 		}
-		for i, id := range permUpdateOptions.Users {
-			if id == jsUserID {
-				log.Infof("jumpserver asset perms %s have added for user %s", permName, jsUserID)
-				break
-			}
-			if i == len(permUpdateOptions.Users)-1 {
-				permUpdateOptions.Users = append(permUpdateOptions.Users, jsUserID)
+		if len(permUpdateOptions.Users) == 0 {
+			permUpdateOptions.Users = append(permUpdateOptions.Users, jsUserID)
+		} else {
+			for i, id := range permUpdateOptions.Users {
+				if id == jsUserID {
+					log.Infof("jumpserver asset perms %s have added for user %s", permName, jsUserID)
+					break
+				}
+				if i == len(permUpdateOptions.Users)-1 {
+					permUpdateOptions.Users = append(permUpdateOptions.Users, jsUserID)
+				}
 			}
 		}
 		permParams, _ := permUpdateOptions.Params()

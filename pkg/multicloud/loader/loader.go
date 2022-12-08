@@ -30,6 +30,8 @@ import (
 	_ "yunion.io/x/onecloud/pkg/multicloud/hcso/provider"
 	_ "yunion.io/x/onecloud/pkg/multicloud/huawei/provider"
 	_ "yunion.io/x/onecloud/pkg/multicloud/jdcloud/provider" // public clouds
+	_ "yunion.io/x/onecloud/pkg/multicloud/nas/provider"
+	_ "yunion.io/x/onecloud/pkg/multicloud/nas/xgfs/provider"
 	_ "yunion.io/x/onecloud/pkg/multicloud/nutanix/provider" // private clouds
 	_ "yunion.io/x/onecloud/pkg/multicloud/objectstore/ceph/provider"
 	_ "yunion.io/x/onecloud/pkg/multicloud/objectstore/provider"

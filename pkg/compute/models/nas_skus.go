@@ -19,6 +19,8 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+	"yunion.io/x/onecloud/pkg/cloudprovider"
+	"yunion.io/x/pkg/tristate"
 
 	"yunion.io/x/jsonutils"
 	"yunion.io/x/log"
@@ -184,9 +186,24 @@ func (manager *SNasSkuManager) OrderByExtraFields(
 	return q, nil
 }
 
+func (self *SNasSku) RealDelete(ctx context.Context, userCred mcclient.TokenCredential) error {
+	return self.SEnabledStatusStandaloneResourceBase.Delete(ctx, userCred)
+}
+
 func (self *SCloudregion) GetNasSkus() ([]SNasSku, error) {
 	skus := []SNasSku{}
 	q := NasSkuManager.Query().Equals("cloudregion_id", self.Id)
+	err := db.FetchModelObjects(NasSkuManager, q, &skus)
+	if err != nil {
+		return nil, errors.Wrapf(err, "db.FetchModelObjects")
+	}
+	return skus, nil
+}
+
+func (self *SCloudregion) GetNasSkusByExternalId(id string) ([]SNasSku, error) {
+	skus := []SNasSku{}
+	// 避免多集群问题，增加external_id
+	q := NasSkuManager.Query().Equals("cloudregion_id", self.Id).Equals("external_id", id)
 	err := db.FetchModelObjects(NasSkuManager, q, &skus)
 	if err != nil {
 		return nil, errors.Wrapf(err, "db.FetchModelObjects")
@@ -331,4 +348,70 @@ func (manager *SNasSkuManager) PerformSyncSkus(ctx context.Context, userCred mcc
 
 func (manager *SNasSkuManager) GetPropertySyncTasks(ctx context.Context, userCred mcclient.TokenCredential, query api.SkuTaskQueryInput) (jsonutils.JSONObject, error) {
 	return GetPropertySkusSyncTasks(ctx, userCred, query)
+}
+
+func (self *SCloudregion) SyncPrivateCloudNasSkus(ctx context.Context, userCred mcclient.TokenCredential, iskus []cloudprovider.ICloudNasSku, providerId string) compare.SyncResult {
+	lockman.LockRawObject(ctx, self.Id, NasSkuManager.Keyword())
+	defer lockman.ReleaseRawObject(ctx, self.Id, NasSkuManager.Keyword())
+
+	result := compare.SyncResult{}
+
+	dbSkus, err := self.GetNasSkusByExternalId(providerId)
+	if err != nil {
+		result.Error(err)
+		return result
+	}
+
+	removed := make([]SNasSku, 0)
+	commondb := make([]SNasSku, 0)
+	commonext := make([]cloudprovider.ICloudNasSku, 0)
+	added := make([]cloudprovider.ICloudNasSku, 0)
+
+	err = compare.CompareSets(dbSkus, iskus, &removed, &commondb, &commonext, &added)
+	if err != nil {
+		result.Error(err)
+		return result
+	}
+
+	for i := 0; i < len(removed); i += 1 {
+		err = removed[i].Delete(ctx, userCred)
+		if err != nil {
+			result.DeleteError(err)
+			continue
+		}
+		result.Delete()
+	}
+	for i := 0; i < len(added); i += 1 {
+		err = self.newFromPrivateCloudNasSku(ctx, userCred, added[i], providerId)
+		if err != nil {
+			result.AddError(err)
+		} else {
+			result.Add()
+		}
+	}
+	return result
+}
+
+func (self *SCloudregion) newFromPrivateCloudNasSku(ctx context.Context, userCred mcclient.TokenCredential, ext cloudprovider.ICloudNasSku, providerId string) error {
+	sku := &SNasSku{}
+	sku.SetModelManager(NasSkuManager, sku)
+	sku.Name = ext.GetName()
+	sku.Description = ext.GetDesc()
+	//sku.ExternalId = ext.GetGlobalId()
+	sku.ExternalId = providerId
+	sku.CloudregionId = self.Id
+	sku.Provider = ext.GetProvider()
+	sku.PrepaidStatus = ext.GetPrepaidStatus()
+	sku.PostpaidStatus = ext.GetPostpaidStatus()
+	sku.StorageType = ext.GetStorageType()
+	sku.DiskSizeStep = ext.GetDiskSizeStep()
+	sku.MaxDiskSizeGb = ext.GetMaxDiskSizeGb()
+	sku.MinDiskSizeGb = ext.GetMinDiskSizeGb()
+	sku.NetworkTypes = ext.GetNetworkTypes()
+	sku.FileSystemType = ext.GetFileSystemType()
+	sku.Protocol = ext.GetProtocol()
+	sku.Enabled = tristate.True
+	//sku.Enabled = tristate.NewFromBool(!ext.GetSyncOnly())
+	sku.Status = api.NAS_SKU_AVAILABLE
+	return NasSkuManager.TableSpec().Insert(ctx, sku)
 }

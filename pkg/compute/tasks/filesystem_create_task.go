@@ -32,7 +32,6 @@ import (
 	"context"
 	"strings"
 	"time"
-
 	"yunion.io/x/jsonutils"
 	"yunion.io/x/log"
 	"yunion.io/x/pkg/errors"
@@ -69,8 +68,6 @@ func (self *FileSystemCreateTask) OnInit(ctx context.Context, obj db.IStandalone
 		return
 	}
 
-	zone, _ := fs.GetZone()
-
 	opts := &cloudprovider.FileSystemCraeteOptions{
 		Name:           fs.Name,
 		Desc:           fs.Description,
@@ -78,20 +75,24 @@ func (self *FileSystemCreateTask) OnInit(ctx context.Context, obj db.IStandalone
 		StorageType:    fs.StorageType,
 		Protocol:       fs.Protocol,
 		FileSystemType: fs.FileSystemType,
-		ZoneId:         strings.TrimPrefix(zone.ExternalId, iRegion.GetGlobalId()+"/"),
+		//ZoneId:         strings.TrimPrefix(zone.ExternalId, iRegion.GetGlobalId()+"/"),
 	}
 
-	netId := jsonutils.GetAnyString(self.GetParams(), []string{"network_id"})
-	if len(netId) > 0 {
-		net, err := models.NetworkManager.FetchById(netId)
-		if err != nil {
-			self.taskFailed(ctx, fs, errors.Wrapf(err, "NetworkManager.FetchById(%s)", netId))
-			return
+	if iRegion.GetProvider() != api.CLOUD_PROVIDER_XGFS {
+		zone, _ := fs.GetZone()
+		opts.ZoneId = strings.TrimPrefix(zone.ExternalId, iRegion.GetGlobalId()+"/")
+		netId := jsonutils.GetAnyString(self.GetParams(), []string{"network_id"})
+		if len(netId) > 0 {
+			net, err := models.NetworkManager.FetchById(netId)
+			if err != nil {
+				self.taskFailed(ctx, fs, errors.Wrapf(err, "NetworkManager.FetchById(%s)", netId))
+				return
+			}
+			network := net.(*models.SNetwork)
+			opts.NetworkId = network.ExternalId
+			vpc, _ := network.GetVpc()
+			opts.VpcId = vpc.ExternalId
 		}
-		network := net.(*models.SNetwork)
-		opts.NetworkId = network.ExternalId
-		vpc, _ := network.GetVpc()
-		opts.VpcId = vpc.ExternalId
 	}
 
 	log.Infof("nas create params: %s", jsonutils.Marshal(opts).String())
@@ -99,17 +100,20 @@ func (self *FileSystemCreateTask) OnInit(ctx context.Context, obj db.IStandalone
 	iFs, err := iRegion.CreateICloudFileSystem(opts)
 	if err != nil {
 		self.taskFailed(ctx, fs, errors.Wrapf(err, "iRegion.CreaetICloudFileSystem"))
-		return
+		if iFs == nil {
+			return
+		}
 	}
 	db.SetExternalId(fs, self.GetUserCred(), iFs.GetGlobalId())
 
-	cloudprovider.WaitMultiStatus(iFs, []string{api.NAS_STATUS_AVAILABLE, api.NAS_STATUS_CREATE_FAILED}, time.Second*5, time.Minute*10)
-
-	tags, _ := fs.GetAllUserMetadata()
-	if len(tags) > 0 {
-		err = iFs.SetTags(tags, true)
-		if err != nil {
-			logclient.AddActionLogWithStartable(self, fs, logclient.ACT_UPDATE, errors.Wrapf(err, "SetTags"), self.UserCred, false)
+	if iRegion.GetProvider() != api.CLOUD_PROVIDER_XGFS {
+		cloudprovider.WaitMultiStatus(iFs, []string{api.NAS_STATUS_AVAILABLE, api.NAS_STATUS_CREATE_FAILED}, time.Second*5, time.Minute*10)
+		tags, _ := fs.GetAllUserMetadata()
+		if len(tags) > 0 {
+			err = iFs.SetTags(tags, true)
+			if err != nil {
+				logclient.AddActionLogWithStartable(self, fs, logclient.ACT_UPDATE, errors.Wrapf(err, "SetTags"), self.UserCred, false)
+			}
 		}
 	}
 
@@ -118,11 +122,14 @@ func (self *FileSystemCreateTask) OnInit(ctx context.Context, obj db.IStandalone
 		Action: notifyclient.ActionCreate,
 	})
 
-	self.SetStage("OnSyncstatusComplete", nil)
+	if err == nil {
+		self.SetStage("OnSyncstatusComplete", nil)
+	}
 	fs.StartSyncstatus(ctx, self.GetUserCred(), self.GetTaskId())
 }
 
 func (self *FileSystemCreateTask) OnSyncstatusComplete(ctx context.Context, fs *models.SFileSystem, data jsonutils.JSONObject) {
+	fs.NotifyInitiatorFeishuFileSystemEvent(ctx, self.UserCred)
 	self.SetStageComplete(ctx, nil)
 }
 

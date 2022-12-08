@@ -57,6 +57,22 @@ type SfsTurbo struct {
 	Description         string
 }
 
+func (self *SfsTurbo) GetProjectId() string {
+	return ""
+}
+
+func (self *SfsTurbo) GetPath() string {
+	return ""
+}
+
+func (self *SfsTurbo) IsShared() bool {
+	return false
+}
+
+func (self *SfsTurbo) GetLastModified() time.Time {
+	return time.Now()
+}
+
 func (self *SfsTurbo) GetName() string {
 	return self.Name
 }
@@ -128,6 +144,14 @@ func (self *SfsTurbo) GetCapacityGb() int64 {
 
 func (self *SfsTurbo) GetUsedCapacityGb() int64 {
 	return int64(self.Size - self.AvailCapacity)
+}
+
+func (self *SfsTurbo) GetFileQuota() int64 {
+	return 0
+}
+
+func (self *SfsTurbo) GetFileCount() int64 {
+	return 0
 }
 
 func (self *SfsTurbo) GetMountTargetCountLimit() int {

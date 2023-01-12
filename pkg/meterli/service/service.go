@@ -65,8 +65,8 @@ func StartService() {
 	//cron.AddJobAtIntervals("CleanPendingDeleteDisks", time.Duration(opts.PendingDeleteCheckSeconds)*time.Second, models.DiskManager.CleanPendingDeleteDisks)
 	//cron.AddJobEveryFewDays("Test", 1, 0, 0, models.BillManager.CheckBill, true)
 
-	cron.AddJobEveryFewHour("ComputeBill", 1, 0, 0, models.BillManager.CheckBill, false)
-	//cron.AddJobAtIntervalsWithStartRun("ComputeBill", time.Duration(10)*time.Second, models.BillManager.CheckBill, false)
+	cron.AddJobEveryFewHour("CheckDailyBill", 1, 0, 0, models.BillManager.CheckDailyBill, false)
+	cron.AddJobAtIntervalsWithStartRun("CheckHourlyBill", time.Duration(15)*time.Minute, models.BillManager.CheckHourlyBill, false)
 	cron.AddJobAtIntervalsWithStartRun("SyncResources", time.Duration(30)*time.Minute, models.BillResourceManager.SyncResources, false)
 	go cron.Start()
 

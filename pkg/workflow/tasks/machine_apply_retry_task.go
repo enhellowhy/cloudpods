@@ -41,6 +41,7 @@ func init() {
 func (self *MachineApplyRetryTask) taskFailed(ctx context.Context, workflow *models.SWorkflowProcessInstance, reason string) {
 	log.Errorf("fail to retry apply machine workflow %q", workflow.GetId())
 	workflow.SetStatus(self.UserCred, apis.WORKFLOW_INSTANCE_STATUS_FAILED, reason)
+	workflow.SetMetadata(ctx, "sys_error", reason, self.UserCred)
 	//workflow.SetState(models.COMPLETED)
 	logclient.AddActionLogWithContext(ctx, workflow, logclient.ACT_BPM_APPLY_MACHINE, reason, self.UserCred, false)
 	self.SetStageFailed(ctx, jsonutils.NewString(reason))

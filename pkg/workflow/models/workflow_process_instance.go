@@ -208,6 +208,10 @@ func (manager *SWorkflowProcessInstanceManager) FetchCustomizeColumns(
 	//recordIds := make([]string, len(objs))
 	for i := range rows {
 		instance := objs[i].(*SWorkflowProcessInstance)
+		metadata, err := instance.GetAllMetadata(ctx, userCred)
+		if err != nil {
+			log.Errorf("workflow instance get all metadata err %v", err)
+		}
 		var endTime time.Time
 		if instance.State == COMPLETED || instance.State == EXTERNALLY_TERMINATED {
 			endTime = instance.UpdatedAt
@@ -301,6 +305,7 @@ func (manager *SWorkflowProcessInstanceManager) FetchCustomizeColumns(
 			//	ServerCreateParameter: instance.Setting,
 			//	ServerConf:            instance.ServerConf,
 			//},
+			Metadata:  metadata,
 			Variables: variables,
 		}
 	}

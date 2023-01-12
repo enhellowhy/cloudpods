@@ -22,7 +22,9 @@ import (
 	"strings"
 	"time"
 	"yunion.io/x/jsonutils"
+	"yunion.io/x/log"
 	api "yunion.io/x/onecloud/pkg/apis/billing"
+	"yunion.io/x/onecloud/pkg/apis/compute"
 	"yunion.io/x/onecloud/pkg/cloudcommon/db"
 	"yunion.io/x/onecloud/pkg/httperrors"
 	"yunion.io/x/onecloud/pkg/mcclient"
@@ -49,22 +51,26 @@ const (
 	ACTION_QUERY_GROUP   = "querygroup"
 
 	// Action
-	RES_TYPE_ALL       = "all"
-	RES_TYPE_SERVER    = "server"
-	RES_TYPE_INSTANCE  = "instance"
-	RES_TYPE_VM        = "vm"
-	RES_TYPE_BAREMETAL = "baremetal"
-	RES_TYPE_CPU       = "cpu"
-	RES_TYPE_MEM       = "mem"
-	RES_TYPE_DISK      = "disk"
-	RES_TYPE_EIP       = "eip"
+	RES_TYPE_ALL        = "all"
+	RES_TYPE_SERVER     = "server"
+	RES_TYPE_INSTANCE   = "instance"
+	RES_TYPE_VM         = "vm"
+	RES_TYPE_BAREMETAL  = "baremetal"
+	RES_TYPE_CPU        = "cpu"
+	RES_TYPE_MEM        = "mem"
+	RES_TYPE_DISK       = "disk"
+	RES_TYPE_FILESYSTEM = "filesystem"
+	RES_TYPE_BUCKET     = "bucket"
+	RES_TYPE_EIP        = "eip"
 )
 
 // no order
 var resMap = map[string]string{
-	"cpu":  "g1,c1,r1",
-	"mem":  "",
-	"disk": "rotate::local,ssd::local,ssd::rbd,rotate::rbd,hybrid::rbd",
+	"cpu":        "g1,c1,r1",
+	"mem":        "",
+	"disk":       "rotate::local,ssd::local,ssd::rbd,rotate::rbd,hybrid::rbd",
+	"filesystem": "standard,performance,capacity",
+	"bucket":     "data,cold,archived",
 }
 
 // +onecloud:swagger-gen-ignore
@@ -234,8 +240,165 @@ func (manager *SRateManager) InitializeData() error {
 				_ = manager.TableSpec().Insert(context.TODO(), rate)
 			}
 		}
+	} else {
+		for res, models := range resMap {
+			switch res {
+			case RES_TYPE_CPU:
+				for _, model := range strings.Split(models, ",") {
+					count, err := manager.GetResourceModelCount(res, model)
+					if err != nil {
+						log.Errorf("get resource %s model %s count err %s", res, model, err)
+						continue
+					}
+					if count > 0 {
+						continue
+					}
+
+					rate := &SRate{}
+					rate.SetModelManager(manager, rate)
+					rate.Id = db.DefaultUUIDGenerator()
+					rate.Model = model
+					rate.ResourceType = res
+					rate.Brand = "Default"
+					rate.PriceType = "amount"
+					if model == "c1" {
+						rate.Price = 0.001
+					} else if model == "r1" {
+						rate.Price = 0.002
+					} else {
+						rate.Price = 0.004
+					}
+					//rate.EnableTime = time.Now().UTC()
+					rate.EnableTime, _ = time.Parse(Date_FORMAT, time.Now().Format(Date_FORMAT))
+					_ = manager.TableSpec().Insert(context.TODO(), rate)
+				}
+			case RES_TYPE_DISK:
+				for _, model := range strings.Split(models, ",") {
+					count, err := manager.GetResourceModelCount(res, model)
+					if err != nil {
+						log.Errorf("get resource %s model %s count err %s", res, model, err)
+						continue
+					}
+					if count > 0 {
+						continue
+					}
+
+					rate := &SRate{}
+					rate.SetModelManager(manager, rate)
+					rate.Id = db.DefaultUUIDGenerator()
+					rate.Model = model
+					rate.ResourceType = res
+					rate.Brand = "Default"
+					rate.PriceType = "amount"
+					switch model {
+					case DISK_ROTATE_LOCAL:
+						rate.Price = 0.00
+					case DISK_SSD_LOCAL:
+						rate.Price = 0.00
+					case DISK_ROTATE_RBD:
+						rate.Price = 0.00003787
+					case DISK_SSD_RBD:
+						rate.Price = 0.000194979
+					case DISK_HYBRID_RBD:
+						rate.Price = 0.00005787
+					}
+					rate.EnableTime, _ = time.Parse(Date_FORMAT, time.Now().Format(Date_FORMAT))
+					_ = manager.TableSpec().Insert(context.TODO(), rate)
+				}
+			case RES_TYPE_FILESYSTEM:
+				for _, model := range strings.Split(models, ",") {
+					count, err := manager.GetResourceModelCount(RES_TYPE_FILESYSTEM, model)
+					if err != nil {
+						log.Errorf("get resource %s model %s count err %s", RES_TYPE_FILESYSTEM, model, err)
+						continue
+					}
+					if count > 0 {
+						continue
+					}
+
+					rate := &SRate{}
+					rate.SetModelManager(manager, rate)
+					rate.Id = db.DefaultUUIDGenerator()
+					rate.Model = model
+					rate.ResourceType = res
+					rate.Brand = "Default"
+					rate.PriceType = "amount"
+					switch model {
+					case compute.NAS_STORAGE_TYPE_STANDARD:
+						rate.Price = 0.000059651
+					case compute.NAS_STORAGE_TYPE_PERFORMANCE:
+						rate.Price = 0.00019854
+					case compute.NAS_STORAGE_TYPE_CAPACITY:
+						rate.Price = 0.000043081
+					}
+					rate.EnableTime, _ = time.Parse(Date_FORMAT, time.Now().Format(Date_FORMAT))
+					_ = manager.TableSpec().Insert(context.TODO(), rate)
+				}
+			case RES_TYPE_BUCKET:
+				for _, model := range strings.Split(models, ",") {
+					count, err := manager.GetResourceModelCount(RES_TYPE_BUCKET, model)
+					if err != nil {
+						log.Errorf("get resource %s model %s count err %s", RES_TYPE_BUCKET, model, err)
+						continue
+					}
+					if count > 0 {
+						continue
+					}
+
+					rate := &SRate{}
+					rate.SetModelManager(manager, rate)
+					rate.Id = db.DefaultUUIDGenerator()
+					rate.Model = model
+					rate.ResourceType = res
+					rate.Brand = "Default"
+					rate.PriceType = "amount"
+					switch model {
+					case "data":
+						rate.Price = 0.000059651
+					case "cold":
+						rate.Price = 0.000043081
+					case "archived":
+						rate.Price = 0.000031283
+					}
+					rate.EnableTime, _ = time.Parse(Date_FORMAT, time.Now().Format(Date_FORMAT))
+					_ = manager.TableSpec().Insert(context.TODO(), rate)
+				}
+			case RES_TYPE_MEM:
+				count, err := manager.GetResourceModelCount(res, "")
+				if err != nil {
+					log.Errorf("get resource %s model %s count err %s", res, "", err)
+					continue
+				}
+				if count > 0 {
+					continue
+				}
+
+				rate := &SRate{}
+				rate.SetModelManager(manager, rate)
+				rate.Id = db.DefaultUUIDGenerator()
+				rate.Model = ""
+				rate.ResourceType = res
+				rate.Brand = "Default"
+				rate.PriceType = "amount"
+				rate.Price = 0.004
+				//rate.EnableTime = time.Now().UTC()
+				rate.EnableTime, _ = time.Parse(Date_FORMAT, time.Now().Format(Date_FORMAT))
+				_ = manager.TableSpec().Insert(context.TODO(), rate)
+			}
+		}
 	}
 	return nil
+}
+
+func (manager *SRateManager) GetResourceModelCount(resource, model string) (int, error) {
+	q := manager.Query().Equals("resource_type", resource).Equals("model", model)
+	//q = q.Filter(
+	//	sqlchemy.OR(
+	//		sqlchemy.Equals(q.Field("name"), name),
+	//		sqlchemy.Equals(q.Field("id"), name),
+	//	),
+	//)
+	return q.CountWithError()
 }
 
 func (manager *SRateManager) ValidateCreateData(

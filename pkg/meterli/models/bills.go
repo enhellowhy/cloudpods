@@ -27,10 +27,14 @@ import (
 	"yunion.io/x/onecloud/pkg/cloudcommon/db"
 	"yunion.io/x/onecloud/pkg/httperrors"
 	"yunion.io/x/onecloud/pkg/mcclient"
+	"yunion.io/x/onecloud/pkg/mcclient/auth"
 	"yunion.io/x/onecloud/pkg/mcclient/modules/compute"
+	"yunion.io/x/onecloud/pkg/meterli/options"
+	"yunion.io/x/onecloud/pkg/util/hashcache"
 	"yunion.io/x/onecloud/pkg/util/rbacutils"
 	"yunion.io/x/onecloud/pkg/util/stringutils2"
 	"yunion.io/x/pkg/errors"
+	"yunion.io/x/pkg/gotypes"
 	"yunion.io/x/sqlchemy"
 )
 
@@ -66,6 +70,10 @@ func init() {
 		),
 	}
 	BillManager.SetVirtualObject(BillManager)
+	managerDelegate = &sManagerDelegate{
+		//users:     hashcache.NewCache(1024, time.Minute*30),
+		buckets: hashcache.NewCache(10, time.Hour*24),
+	}
 }
 
 /*
@@ -169,7 +177,8 @@ type SBill struct {
 	Zone                 string    `width:"128" charset:"utf8" nullable:"true" list:"user" create:"domain_optional" update:"admin" json:"zone"`
 	Currency             string    `width:"48" charset:"ascii" index:"true" list:"user" create:"domain_optional" update:"admin" json:"currency"`
 	Spec                 string    `width:"128" charset:"ascii" nullable:"true" list:"user" create:"domain_optional" update:"admin" json:"spec"`
-	Mark                 string    `width:"128" charset:"utf8" list:"user" update:"user" json:"mark"`
+	Mark                 string    `width:"128" charset:"utf8" list:"user" update:"user" default:"day" json:"mark"`
+	Hour                 int       `list:"user" update:"user" index:"true" json:"hour"`
 	Day                  int       `list:"user" update:"user" index:"true" json:"day"`
 	Month                int       `list:"user" update:"user" index:"true" json:"month"`
 	ProgressId           string    `width:"128" charset:"ascii" index:"true" list:"user" create:"domain_optional" update:"admin" json:"progress_id"`
@@ -469,7 +478,7 @@ func (m *SBillManager) VerifyExistingGuests(ctx context.Context, session *mcclie
 	return nil
 }
 
-func (manager *SBillManager) Compute(progressId string, billResource *SBillResource) (*api.BillCreateInput, error) {
+func (manager *SBillManager) Compute(s *mcclient.ClientSession, progressId string, billResource *SBillResource, pool string, size int64) (*api.BillCreateInput, error) {
 	input := new(api.BillCreateInput)
 	switch billResource.ResourceType {
 	case RES_TYPE_SERVER:
@@ -510,6 +519,44 @@ func (manager *SBillManager) Compute(progressId string, billResource *SBillResou
 		input.ResourceType = RES_TYPE_DISK
 		input.UsageType = RES_TYPE_DISK
 		input.PriceUnit = PRICE_UNIT_DISK
+	case RES_TYPE_FILESYSTEM:
+		fsRate, err := manager.GetEffectiveRate(RES_TYPE_FILESYSTEM, billResource.Model, time.Now())
+		if err != nil {
+			return nil, err
+		}
+		input.Rate = fsRate.Price
+		// use actual capacity
+		params := jsonutils.NewDict()
+		params.Set("stats_only", jsonutils.NewBool(true))
+		ret, err := compute.FileSystems.PerformAction(s, billResource.ResourceId, "sync", params)
+		if err != nil {
+			return nil, err
+		}
+		if ret == nil {
+			return nil, fmt.Errorf("file system sync result is nil")
+		}
+		sizeB, err := ret.Int("used_capacity")
+		if err != nil {
+			return nil, err
+		}
+		sizeGB := int(sizeB / (1024 * 1024 * 1024))
+		input.Spec = billResource.Model + " " + strconv.Itoa(sizeGB) + "GB"
+		input.Usage = 1 * float64(sizeGB)
+		input.ResourceType = RES_TYPE_FILESYSTEM
+		input.UsageType = RES_TYPE_FILESYSTEM
+		input.PriceUnit = PRICE_UNIT_DISK
+	case RES_TYPE_BUCKET:
+		poolRate, err := manager.GetEffectiveRate(RES_TYPE_BUCKET, pool, time.Now())
+		if err != nil {
+			return nil, err
+		}
+		input.Rate = poolRate.Price
+		sizeGB := int(size / (1024 * 1024 * 1024))
+		input.Spec = pool + " " + strconv.Itoa(sizeGB) + "GB"
+		input.Usage = 1 * float64(sizeGB)
+		input.ResourceType = RES_TYPE_BUCKET
+		input.UsageType = RES_TYPE_BUCKET
+		input.PriceUnit = PRICE_UNIT_DISK
 	}
 	input.GrossAmount = input.Rate * input.Usage
 	input.Amount = input.Rate * input.Usage
@@ -545,7 +592,7 @@ func (manager *SBillManager) GetEffectiveRate(resType, model string, t time.Time
 	return rate, nil
 }
 
-func (manager *SBillManager) CheckBill(ctx context.Context, userCred mcclient.TokenCredential, isStart bool) {
+func (manager *SBillManager) CheckDailyBill(ctx context.Context, userCred mcclient.TokenCredential, isStart bool) {
 	//session := auth.GetAdminSession(ctx, "", "")
 	t := time.Now()
 	date, _ := strconv.Atoi(t.Add(-24 * time.Hour).Format(Date_Day_FORMAT))
@@ -569,20 +616,21 @@ func (manager *SBillManager) CheckBill(ctx context.Context, userCred mcclient.To
 	}
 
 	//server := manager.VerifyExistingGuests(ctx, session)
-	billResources, err := BillResourceManager.GetAllBillResources()
+	resDaily := []string{RES_TYPE_BAREMETAL, RES_TYPE_SERVER, RES_TYPE_DISK}
+	billResources, err := BillResourceManager.GetAllBillResources(resDaily)
 	if err != nil {
 		log.Errorf("GetBillResources err %s", err)
 		return
 	}
 	errs := make([]error, 0)
 	for i := range billResources {
-		input, err := manager.Compute(progressId, &billResources[i])
+		input, err := manager.Compute(nil, progressId, &billResources[i], "", 0)
 		if err != nil {
 			log.Errorf("create compute input err", err)
 			errs = append(errs, errors.Wrapf(err, "billResources:%s compute err", billResources[i].ResourceName))
 			continue
 		}
-		err = manager.CreateBill(ctx, input, t)
+		err = manager.CreateBill(ctx, DAILY_BILL_PULL, input, t)
 		if err != nil {
 			log.Errorf("create bill err", err)
 			errs = append(errs, errors.Wrapf(err, "billResources:%s create bill err", billResources[i].ResourceName))
@@ -591,7 +639,7 @@ func (manager *SBillManager) CheckBill(ctx context.Context, userCred mcclient.To
 	}
 	//finish progress
 	if len(errs) != 0 {
-		log.Errorf("This cronJob about CheckBill finished with err count is %d", len(errs))
+		log.Errorf("This cronJob about CheckDailyBill finished with err count is %d", len(errs))
 		misc := errors.NewAggregate(errs)
 		err = ProgressManager.FinishDailyPullProgress(date, misc.Error(), len(errs))
 		if err != nil {
@@ -599,7 +647,7 @@ func (manager *SBillManager) CheckBill(ctx context.Context, userCred mcclient.To
 			return
 		}
 	} else {
-		log.Infof("This checkBill finished with %d billResources", len(billResources))
+		log.Infof("This CheckDailyBill finished with %d billResources", len(billResources))
 		err = ProgressManager.FinishDailyPullProgress(date, "", 0)
 		if err != nil {
 			log.Errorf("FinishDailyPullProgress err %s", err)
@@ -609,7 +657,7 @@ func (manager *SBillManager) CheckBill(ctx context.Context, userCred mcclient.To
 }
 
 func (manager *SBillManager) InDailyPullBill(date int) bool {
-	q := manager.Query().Equals("day", date)
+	q := manager.Query().Equals("day", date).Equals("mark", "day")
 	count, err := q.CountWithError()
 	if err != nil {
 		log.Errorf("get daily bill err %s", err)
@@ -622,12 +670,11 @@ func (manager *SBillManager) InDailyPullBill(date int) bool {
 	return false
 }
 
-func (manager *SBillManager) CreateBill(ctx context.Context, input *api.BillCreateInput, t time.Time) error {
-	currentTime := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
+func (manager *SBillManager) CreateBill(ctx context.Context, billType string, input *api.BillCreateInput, t time.Time) error {
 	bill := &SBill{
-		UsageStartTime: currentTime.AddDate(0, 0, -1),
-		UsageEndTime:   currentTime,
-		PaymentTime:    time.Now(),
+		//UsageStartTime: currentTime.AddDate(0, 0, -1),
+		//UsageEndTime:   currentTime,
+		PaymentTime: time.Now(),
 	}
 	bill.Id = db.DefaultUUIDGenerator()
 	bill.Domain = "Default"
@@ -654,11 +701,247 @@ func (manager *SBillManager) CreateBill(ctx context.Context, input *api.BillCrea
 	bill.GrossAmount = round(input.GrossAmount, 6)
 	bill.Amount = round(input.Amount, 6)
 	bill.PriceUnit = input.PriceUnit
-	bill.Day, _ = strconv.Atoi(currentTime.Add(-24 * time.Hour).Format(Date_Day_FORMAT))
-	bill.Month, _ = strconv.Atoi(currentTime.Add(-24 * time.Hour).Format(Date_Month_FORMAT))
+	if billType == HOURLY_BILL_PULL {
+		hourTime := time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), 0, 0, 0, t.Location())
+		bill.UsageStartTime = hourTime.Add(-1 * time.Hour)
+		bill.UsageEndTime = hourTime
+		bill.Hour = hourTime.Add(-1 * time.Hour).Hour()
+		bill.Day, _ = strconv.Atoi(hourTime.Add(-1 * time.Hour).Format(Date_Day_FORMAT))
+		bill.Month, _ = strconv.Atoi(hourTime.Add(-1 * time.Hour).Format(Date_Month_FORMAT))
+		bill.Mark = "hour"
+	} else {
+		dayTime := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
+		bill.UsageStartTime = dayTime.AddDate(0, 0, -1)
+		bill.UsageEndTime = dayTime
+		bill.Hour = 0
+		bill.Day, _ = strconv.Atoi(dayTime.Add(-24 * time.Hour).Format(Date_Day_FORMAT))
+		bill.Month, _ = strconv.Atoi(dayTime.Add(-24 * time.Hour).Format(Date_Month_FORMAT))
+		bill.Mark = "day"
+	}
 
 	bill.SetModelManager(manager, bill)
 	return manager.TableSpec().Insert(ctx, bill)
+}
+
+type sManagerDelegate struct {
+	buckets *hashcache.Cache
+	//users     *hashcache.Cache
+}
+
+var managerDelegate *sManagerDelegate
+
+//func init() {
+//	managerDelegate = &sManagerDelegate{
+//		//users:     hashcache.NewCache(1024, time.Minute*30),
+//		buckets: hashcache.NewCache(10, time.Hour*24),
+//	}
+//}
+//
+func (manager *sManagerDelegate) getCacheBucket() map[string]map[string]int64 {
+	val := manager.buckets.Get("buckets")
+	if !gotypes.IsNil(val) {
+		return val.(map[string]map[string]int64)
+	}
+	return nil
+}
+
+func (manager *sManagerDelegate) setCacheBucket(buckets map[string]map[string]int64) {
+	manager.buckets.AtomicSet("buckets", buckets)
+}
+
+func (manager *sManagerDelegate) getCacheBucketTime() string {
+	val := manager.buckets.Get("time")
+	if !gotypes.IsNil(val) {
+		return val.(string)
+	}
+	return ""
+}
+
+func (manager *sManagerDelegate) setCacheBucketTime(t string) {
+	manager.buckets.AtomicSet("time", t)
+}
+
+// Hourly
+func (manager *SBillManager) CheckHourlyBill(ctx context.Context, userCred mcclient.TokenCredential, isStart bool) {
+	t := time.Now()
+	date, _ := strconv.Atoi(t.Add(-1 * time.Hour).Format(Date_Day_FORMAT))
+	hour := t.Add(-1 * time.Hour).Hour()
+	log.Infof("start check hourly bill, date %d, hour %d.", date, hour)
+	inProgress := ProgressManager.InHourlyPullProgress(hour, date)
+	var progressId string
+	if !inProgress {
+		// 增加二次检查 check daily bill
+		time.Sleep(5 * time.Second)
+		inBill := BillManager.InHourlyPullBill(hour, date)
+		if inBill {
+			return
+		}
+		pId, err := ProgressManager.CreateHourlyPullProgress(ctx, date, hour)
+		if err != nil {
+			log.Errorf("CreateHourlyPullProgress err %s", err)
+			return
+		}
+		progressId = pId
+	} else {
+		return
+	}
+
+	//filesystem
+	resHourly := []string{RES_TYPE_FILESYSTEM}
+	billResources, err := BillResourceManager.GetAllBillResources(resHourly)
+	if err != nil {
+		log.Errorf("GetBillResources err %s", err)
+		return
+	}
+	errs := make([]error, 0)
+	s := auth.GetAdminSession(ctx, options.Options.Region)
+	for i := range billResources {
+		input, err := manager.Compute(s, progressId, &billResources[i], "", 0)
+		if err != nil {
+			log.Errorf("create compute input err", err)
+			errs = append(errs, errors.Wrapf(err, "billResources:%s compute err", billResources[i].ResourceName))
+			continue
+		}
+		err = manager.CreateBill(ctx, HOURLY_BILL_PULL, input, t)
+		if err != nil {
+			log.Errorf("create bill err", err)
+			errs = append(errs, errors.Wrapf(err, "billResources:%s create bill err", billResources[i].ResourceName))
+			continue
+		}
+	}
+
+	//bucket
+	bucketHourly := []string{RES_TYPE_BUCKET}
+	bucketResources, err := BillResourceManager.GetAllBillResources(bucketHourly)
+	if err != nil {
+		log.Errorf("GetBillResources err %s", err)
+		return
+	}
+	// use actual capacity
+	if len(bucketResources) == 0 {
+		log.Warningln("there is no buckets resources.")
+		return
+	}
+
+	flag := false
+	remoteBuckets := make(map[string]map[string]int64)
+	//var remoteBuckets map[string]map[string]int64
+	ret, err := compute.Buckets.PerformAction(s, bucketResources[0].ResourceId, "storage-class", nil)
+	if err != nil {
+		log.Errorf("get remote buckets storage classses 0 times err %s", err)
+		for i := 0; i < 3; i++ {
+			time.Sleep(5 * time.Second)
+			log.Infof("try get remote buckets storage classses %d times", i+1)
+			ret, err = compute.Buckets.PerformAction(s, bucketResources[0].ResourceId, "storage-class", nil)
+			if err != nil {
+				log.Errorf("get remote buckets storage classses %d times err %s", i+1, err)
+				continue
+			} else {
+				flag = true
+				break
+			}
+		}
+		//if !flag {
+		//	return
+		//}
+	} else {
+		flag = true
+	}
+
+	//r := rand.Intn(10)
+	//if r%2 == 0 && flag {
+	//	flag = true
+	//} else {
+	//	flag = false
+	//}
+
+	if !flag {
+		remoteBuckets = managerDelegate.getCacheBucket()
+		if remoteBuckets == nil {
+			log.Errorln("get cache bucket nil")
+			return
+		}
+		log.Infof("get remote cache bucket with time %s", managerDelegate.getCacheBucketTime())
+	} else {
+		if ret == nil {
+			log.Errorln("get remote buckets storage classses return is nil, but no error?")
+			return
+		}
+		err = ret.Unmarshal(remoteBuckets)
+		if err != nil {
+			log.Errorf("buckets storage classses unmarshal err %s", err)
+			return
+		}
+		managerDelegate.setCacheBucket(remoteBuckets)
+		managerDelegate.setCacheBucketTime(strconv.Itoa(date) + "/" + strconv.Itoa(hour))
+	}
+
+	for i := range bucketResources {
+		key := bucketResources[i].ResourceName
+		if _, ok := remoteBuckets[key]; !ok {
+			log.Warningf("can not find %s in remote buckets", key)
+			continue
+		}
+		for k, v := range remoteBuckets[key] {
+			pool := "data"
+			switch k {
+			case "default":
+				pool = "data"
+			case "pool-archived":
+				pool = "archived"
+			case "pool-cold", "cold", "cold-standby":
+				pool = "cold"
+			case "boa":
+				log.Warningf("get 'boa' storage class for %s, continue", key)
+				continue
+			}
+
+			input, err := manager.Compute(s, progressId, &bucketResources[i], pool, v)
+			if err != nil {
+				log.Errorf("create compute input err", err)
+				errs = append(errs, errors.Wrapf(err, "billResources:%s compute err", key))
+				continue
+			}
+			err = manager.CreateBill(ctx, HOURLY_BILL_PULL, input, t)
+			if err != nil {
+				log.Errorf("create bill err", err)
+				errs = append(errs, errors.Wrapf(err, "billResources:%s create bill err", key))
+				continue
+			}
+		}
+	}
+	//finish progress
+	if len(errs) != 0 {
+		log.Errorf("This cronJob about CheckHourlyBill finished with err count is %d", len(errs))
+		misc := errors.NewAggregate(errs)
+		err = ProgressManager.FinishHourlyPullProgress(date, hour, misc.Error(), len(errs))
+		if err != nil {
+			log.Errorf("FinishHourlyPullProgress err %s", err)
+			return
+		}
+	} else {
+		log.Infof("This CheckHourlyBill finished with %d billResources", len(billResources)+len(bucketResources))
+		//log.Infof("This CheckHourlyBill finished with %d billResources", len(bucketResources))
+		err = ProgressManager.FinishHourlyPullProgress(date, hour, "", 0)
+		if err != nil {
+			log.Errorf("FinishHourlyPullProgress err %s", err)
+			return
+		}
+	}
+}
+
+func (manager *SBillManager) InHourlyPullBill(hour, date int) bool {
+	q := manager.Query().Equals("day", date).Equals("hour", hour).Equals("mark", "hour")
+	count, err := q.CountWithError()
+	if err != nil {
+		log.Errorf("get daily bill err %s", err)
+		return true
+	}
+	if count > 0 {
+		log.Warningf("the bills of %d is in???", date)
+		return true
+	}
+	return false
 }
 
 type STotal struct {

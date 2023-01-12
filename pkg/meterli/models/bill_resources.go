@@ -212,9 +212,9 @@ func (manager *SBillResourceManager) OrderByExtraFields(
 	return q, nil
 }
 
-func (manager *SBillResourceManager) GetAllBillResources() ([]SBillResource, error) {
+func (manager *SBillResourceManager) GetAllBillResources(resType []string) ([]SBillResource, error) {
 	billResources := make([]SBillResource, 0)
-	q := manager.Query().Equals("exist", true).Equals("expired", false)
+	q := manager.Query().Equals("exist", true).Equals("expired", false).In("resource_type", resType)
 	err := db.FetchModelObjects(manager, q, &billResources)
 	if err != nil {
 		return nil, errors.Wrap(err, "SBillResourceManager FetchModelObjects err")
@@ -294,6 +294,26 @@ func (self *SBillResource) IsChanged(elems ...string) bool {
 	base = append(base, self.Project)
 	base = append(base, self.Model)
 	base = append(base, strconv.Itoa(self.Size))
+
+	var baseSignature = md5.Sum([]byte(strings.Join(base, ",")))
+	baseSign := fmt.Sprintf("%x", baseSignature)
+
+	if sign == baseSign {
+		return false
+	}
+	return true
+}
+
+func (self *SBillResource) IsStorageChanged(elems ...string) bool {
+
+	var signature = md5.Sum([]byte(strings.Join(elems, ",")))
+	sign := fmt.Sprintf("%x", signature)
+
+	base := make([]string, 0)
+	base = append(base, self.ProjectId)
+	base = append(base, self.Project)
+	base = append(base, self.Model)
+	//base = append(base, strconv.Itoa(self.Size))
 
 	var baseSignature = md5.Sum([]byte(strings.Join(base, ",")))
 	baseSign := fmt.Sprintf("%x", baseSignature)

@@ -33,9 +33,10 @@ func init() {
 }
 
 func (self *BpmProcessSubmitTask) taskFailed(ctx context.Context, workflow *models.SWorkflowProcessInstance, reason string) {
-	log.Errorf("fail to send workflow %q", workflow.GetId())
+	log.Errorf("fail to send workflow %s", workflow.GetId())
 	workflow.SetStatus(self.UserCred, apis.WORKFLOW_SUBMIT_STATUS_FAILED, reason)
 	workflow.SetState(models.SUBMIT_FAIL)
+	//workflow.SetMetadata(ctx, "sys_error", reason, self.UserCred)
 	logclient.AddActionLogWithContext(ctx, workflow, logclient.ACT_BPM_SEND_APPLICATION, reason, self.UserCred, false)
 	self.SetStageFailed(ctx, jsonutils.NewString(reason))
 }
@@ -582,9 +583,20 @@ func getSizeStr(size int64) string {
 
 	var unit string
 	switch {
-	case size/(1024*1024*1024*1024) > 0:
+	case size/(1024*1024*1024*1024*1024) > 0:
+		if size%(1024*1024*1024*1024*1024) == 0 {
+			unit = " PB"
+			return strconv.Itoa(int(size/(1024*1024*1024*1024*1024))) + unit
+		}
 		unit = " TB"
 		return strconv.Itoa(int(size/(1024*1024*1024*1024))) + unit
+	case size/(1024*1024*1024*1024) > 0:
+		if size%(1024*1024*1024*1024) == 0 {
+			unit = " TB"
+			return strconv.Itoa(int(size/(1024*1024*1024*1024))) + unit
+		}
+		unit = " GB"
+		return strconv.Itoa(int(size/(1024*1024*1024))) + unit
 	case size/(1024*1024*1024) > 0:
 		unit = " GB"
 		return strconv.Itoa(int(size/(1024*1024*1024))) + unit

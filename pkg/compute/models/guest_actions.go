@@ -5618,10 +5618,10 @@ func (self *SGuest) JoinJumpServer(ctx context.Context, userCred mcclient.TokenC
 	}
 	var permName, systemUser string
 	if self.GetOS() == osprofile.OS_TYPE_WINDOWS {
-		permName = emailPrefix + "-RDP"
+		permName = emailPrefix + "-RDP-all"
 		systemUser = systemUsers["RDP"]
 	} else {
-		permName = emailPrefix + "-SSH"
+		permName = emailPrefix + "-SSH-all"
 		systemUser = systemUsers["SSH"]
 	}
 	jsPerm, err := thirdparty.JsAsset.GetPermsByName(s, permName, nil)

@@ -119,6 +119,7 @@ type FileSystemDetails struct {
 	apis.SharableVirtualResourceDetails
 	ManagedResourceInfo
 	CloudregionResourceInfo
+	SFileSystem
 
 	Vpc                   string
 	Network               string

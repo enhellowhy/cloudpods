@@ -2175,6 +2175,28 @@ func (manager *SBucketManager) ListItemExportKeys(ctx context.Context,
 	return q, nil
 }
 
+func (bucket *SBucket) PerformStorageClass(
+	ctx context.Context,
+	userCred mcclient.TokenCredential,
+	query jsonutils.JSONObject,
+	data jsonutils.JSONObject,
+) (map[string]map[string]int64, error) {
+	if len(bucket.ExternalId) == 0 {
+		return nil, httperrors.NewInvalidStatusError("no external bucket")
+	}
+
+	iregion, err := bucket.GetIRegion(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "bucket.GetIRegion")
+	}
+
+	classes, err := iregion.(*xsky.SXskyClient).GetBucketStorageClasses()
+	if err != nil {
+		return nil, errors.Wrap(err, "xsky.GetBucketStorageClasses")
+	}
+	return classes, nil
+}
+
 func (self *SBucket) NotifyInitiatorFeishuBucketEvent(ctx context.Context, userCred mcclient.TokenCredential) {
 	contentTemplate := "**IT运维通知**\n您在私有云平台申请的存储桶资源开通成功\n桶名称: %s\n对象用户: %s\n访问密钥: %s\n安全密钥: %s\n官方域名: [https://s3.it.lixiangoa.com](https://s3.it.lixiangoa.com)\n私有云控制台地址: [https://cloud.it.lixiangoa.com/](https://cloud.it.lixiangoa.com/)\n___\n如果您使用中遇到任何问题\n可以通过【IT机器人】进行反馈"
 	provider := self.GetCloudprovider()

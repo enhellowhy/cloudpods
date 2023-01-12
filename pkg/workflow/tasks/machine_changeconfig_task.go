@@ -49,6 +49,7 @@ func (self *MachineChangeConfigTask) taskFailed(ctx context.Context, workflow *m
 	log.Errorf("fail to changeconfig machine workflow %q", workflow.GetId())
 	workflow.SetStatus(self.UserCred, apis.WORKFLOW_INSTANCE_STATUS_FAILED, reason)
 	workflow.SetState(models.COMPLETED)
+	workflow.SetMetadata(ctx, "sys_error", reason, self.UserCred)
 	logclient.AddActionLogWithContext(ctx, workflow, logclient.ACT_BPM_CHANGECONFIG_MACHINE, reason, self.UserCred, false)
 	self.SetStageFailed(ctx, jsonutils.NewString(reason))
 }

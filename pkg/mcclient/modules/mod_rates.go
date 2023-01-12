@@ -49,18 +49,22 @@ const (
 	ACTION_QUERY_HSITORY = "queryhistory"
 	ACTION_QUERY_GROUP   = "querygroup"
 
-	RES_TYPE_VM        = "vm"
-	RES_TYPE_BAREMETAL = "baremetal"
-	RES_TYPE_GPU       = "gpu"
-	RES_TYPE_CPU       = "cpu"
-	RES_TYPE_MEM       = "mem"
-	RES_TYPE_DISK      = "disk"
-	RES_TYPE_EIP       = "eip"
-	FLAG_YES           = "YES"
-	FLAG_NO            = "NO"
+	RES_TYPE_VM         = "vm"
+	RES_TYPE_BAREMETAL  = "baremetal"
+	RES_TYPE_GPU        = "gpu"
+	RES_TYPE_CPU        = "cpu"
+	RES_TYPE_FILESYSTEM = "filesystem"
+	RES_TYPE_BUCKET     = "bucket"
+	RES_TYPE_MEM        = "mem"
+	RES_TYPE_DISK       = "disk"
+	RES_TYPE_EIP        = "eip"
+	FLAG_YES            = "YES"
+	FLAG_NO             = "NO"
 
-	CPU_MODEL  = "g1,c1,r1"
-	DISK_MODEL = "rotate::local,ssd::local,ssd::rbd,rotate::rbd,hybrid::rbd"
+	CPU_MODEL        = "g1,c1,r1"
+	DISK_MODEL       = "rotate::local,ssd::local,ssd::rbd,rotate::rbd,hybrid::rbd"
+	FILESYSTEM_MODEL = "standard,performance,capacity"
+	BUCKET_MODEL     = "data,cold,archived"
 )
 
 // no order
@@ -139,6 +143,28 @@ func (this *RateManager) findRateGroup(session *mcclient.ClientSession, params j
 				continue
 			}
 			groups.Data = append(groups.Data, disk)
+		}
+		//RES_TYPE_FILESYSTEM
+		for _, model := range strings.Split(FILESYSTEM_MODEL, ",") {
+			params.(*jsonutils.JSONDict).Set("res_type", jsonutils.NewString(RES_TYPE_FILESYSTEM))
+			params.(*jsonutils.JSONDict).Set("model", jsonutils.NewString(model))
+			fs, err := this.GetEffectiveRes(session, params)
+			if err != nil {
+				log.Errorf("filesystem %v", err)
+				continue
+			}
+			groups.Data = append(groups.Data, fs)
+		}
+		//RES_TYPE_BUCKET
+		for _, model := range strings.Split(BUCKET_MODEL, ",") {
+			params.(*jsonutils.JSONDict).Set("res_type", jsonutils.NewString(RES_TYPE_BUCKET))
+			params.(*jsonutils.JSONDict).Set("model", jsonutils.NewString(model))
+			bs, err := this.GetEffectiveRes(session, params)
+			if err != nil {
+				log.Errorf("bucket %v", err)
+				continue
+			}
+			groups.Data = append(groups.Data, bs)
 		}
 	}
 	groups.Total = len(groups.Data)
@@ -223,7 +249,7 @@ func rateReadFilter(s jsonutils.JSONObject, untilDate string, flag bool, query j
 	switch resType {
 	case RES_TYPE_CPU:
 		unit = "1core"
-	case RES_TYPE_MEM:
+	case RES_TYPE_MEM, RES_TYPE_FILESYSTEM, RES_TYPE_BUCKET:
 		unit = "1GB"
 	case RES_TYPE_EIP:
 		unit = "Mbps"

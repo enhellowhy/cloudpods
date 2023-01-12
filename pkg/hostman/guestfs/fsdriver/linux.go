@@ -990,6 +990,41 @@ func NewUbuntuRootFs(part IDiskPartition) IRootFsDriver {
 	return driver
 }
 
+func (d *SUbuntuRootFs) DeployYunionroot(rootFs IDiskPartition, pubkeys *deployapi.SSHKeys, isInit, enableCloudInit bool) error {
+	err := d.sDebianLikeRootFs.DeployYunionroot(rootFs, pubkeys, isInit, enableCloudInit)
+	if err != nil {
+		log.Errorf("UbuntuDeployYunionroot error: %s", err.Error())
+		return fmt.Errorf("UbuntuDeployYunionroot: %v", err)
+	}
+
+	// test /etc/ssh/*_key.*
+	if rootFs.Exists("/etc/ssh", false) {
+		for _, f := range d.rootFs.ListDir("/etc/ssh", false) {
+			if strings.HasSuffix(f, "_key") || strings.HasSuffix(f, "_key.pub") {
+				log.Infof("test /etc/ssh key files, find %s", f)
+				return nil
+			}
+			//log.Infof("test /etc/ssh key files, find %s", f)
+		}
+		log.Warningln("could not find host key files, generating...")
+		//if rootFs.Exists("/usr/bin/ssh-keygen", false) {
+		//	log.Infoln("get /usr/bin/ssh-keygen", rootFs.GetMountPath())
+		//} else {
+		//	log.Infoln("no get /usr/bin/ssh-keygen", rootFs.GetMountPath())
+		//}
+		output, err := procutils.NewCommand("chroot", rootFs.GetMountPath(), "ssh-keygen", "-A").Output()
+		//output, err := procutils.NewCommand("/usr/bin/ssh-keygen", "-A").Output()
+		if err != nil {
+			return fmt.Errorf("UbuntuDeployYunionroot ssh keygen err: %v", err)
+		} else {
+			log.Infof("Output: '%s'", output)
+			return nil
+		}
+	}
+	log.Warningln("no /etc/ssh dir???")
+	return nil
+}
+
 func (d *SUbuntuRootFs) RootSignatures() []string {
 	sig := d.sDebianLikeRootFs.RootSignatures()
 	return append([]string{"/etc/lsb-release"}, sig...)

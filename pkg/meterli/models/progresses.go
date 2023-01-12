@@ -24,6 +24,7 @@ import (
 )
 
 const (
+	HOURLY_BILL_PULL      = "hourly_bill_pull"
 	DAILY_BILL_PULL       = "daily_bill_pull"
 	MONTHLY_BILL_GENERATE = "monthly_bill_generate"
 )
@@ -78,6 +79,7 @@ type SProgress struct {
 	Progress  int    `list:"user" update:"user" json:"progress"`
 	AccountId string `width:"128" charset:"ascii" index:"true" nullable:"true" list:"user" create:"domain_optional" update:"admin" json:"account_id"`
 	Date      int    `list:"user" update:"user" index:"true" json:"date"`
+	Hour      int    `list:"user" update:"user" index:"true" json:"hour"`
 	Mark      string `width:"128" charset:"utf8" list:"user" update:"user" json:"mark"`
 	TaskKey   string `width:"128" charset:"ascii" list:"user" create:"domain_optional" update:"admin" json:"task_key"`
 	Misc      string `length:"text" nullable:"true"`
@@ -117,6 +119,7 @@ func (manager *SProgressManager) CreateDailyPullProgress(ctx context.Context, da
 	p.Id = db.DefaultUUIDGenerator()
 	p.TaskKey = DAILY_BILL_PULL
 	p.Mark = "OneCloud"
+	p.Hour = 0
 	p.Date = date
 	p.Type = DAILY_BILL_PULL
 	p.Finished = false
@@ -159,6 +162,72 @@ func (manager *SProgressManager) FinishDailyPullProgress(date int, misc string, 
 	})
 	if err != nil {
 		return errors.Wrapf(err, "FinishDailyPullProgress:%d err", date)
+	}
+	return nil
+}
+
+func (manager *SProgressManager) InHourlyPullProgress(hour, date int) bool {
+	q := manager.Query().Equals("date", date).Equals("hour", hour).Equals("type", HOURLY_BILL_PULL)
+	q.DebugQuery()
+	count, err := q.CountWithError()
+	if err != nil {
+		log.Errorf("get %s task progress err %s.", HOURLY_BILL_PULL, err)
+		return true
+	}
+	if count > 0 {
+		log.Debugf("the %s task is in progress.", HOURLY_BILL_PULL)
+		return true
+	}
+	return false
+}
+
+func (manager *SProgressManager) CreateHourlyPullProgress(ctx context.Context, date, hour int) (string, error) {
+	p := new(SProgress)
+
+	p.Id = db.DefaultUUIDGenerator()
+	p.TaskKey = HOURLY_BILL_PULL
+	p.Mark = "OneCloud"
+	p.Date = date
+	p.Hour = hour
+	p.Type = HOURLY_BILL_PULL
+	p.Finished = false
+	p.Progress = 0
+
+	p.SetModelManager(manager, p)
+	err := manager.TableSpec().Insert(ctx, p)
+	if err != nil {
+		return "", err
+	}
+	return p.Id, nil
+}
+
+func (manager *SProgressManager) FinishHourlyPullProgress(date, hour int, misc string, errCount int) error {
+	q := manager.Query().Equals("date", date).Equals("hour", hour).Equals("type", HOURLY_BILL_PULL)
+	count, err := q.CountWithError()
+	if err != nil {
+		log.Errorf("get progress task of %d %d err %v", date, hour, err)
+		return err
+	}
+	if count == 0 {
+		log.Debugf("the %s task empty?", HOURLY_BILL_PULL)
+		return errors.ErrNotFound
+	}
+
+	p := SProgress{}
+	err = q.First(&p)
+	if err != nil {
+		log.Errorf("GetProgress fail: %s", err)
+		return err
+	}
+	p.SetModelManager(ProgressManager, &p) // SetModelManager if else is nil pointer
+	_, err = db.Update(&p, func() error {
+		p.Finished = true
+		p.Progress = 100 - errCount
+		p.Misc = misc
+		return nil
+	})
+	if err != nil {
+		return errors.Wrapf(err, "FinishHourlyPullProgress:%d %d err", date, hour)
 	}
 	return nil
 }

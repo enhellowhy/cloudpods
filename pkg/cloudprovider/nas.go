@@ -20,10 +20,11 @@ import (
 )
 
 type FileSystemCraeteOptions struct {
-	Name           string
-	Desc           string
-	VpcId          string
-	NetworkId      string
+	Name      string
+	Desc      string
+	VpcId     string
+	NetworkId string
+	//unit is GB
 	Capacity       int64
 	StorageType    string
 	Protocol       string

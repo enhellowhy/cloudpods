@@ -751,7 +751,7 @@ func getStorageTypes(
 		}
 	)
 
-	isLocalUsed := false
+	isLocalUsed := true
 	if projectId != "" {
 		isLocalUsed = isStorageLocalUsed(ctx, projectId)
 	}

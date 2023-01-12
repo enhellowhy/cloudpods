@@ -62,16 +62,16 @@ func (this *PriceInfoManager) List(session *mcclient.ClientSession, params jsonu
 		return nil, errors.Wrap(err, "params res_type")
 	}
 	//RES_TYPE_BAREMETAL
-	if resType == RES_TYPE_BAREMETAL {
+	if resType == RES_TYPE_BAREMETAL || resType == RES_TYPE_FILESYSTEM {
 		//cpu:64/mem:128473M/manufacture:Powerleader/model:PR1710P
 		dict := jsonutils.NewDict()
 		dict.Set("scope", jsonutils.NewString("system"))
 		dict.Set("action", jsonutils.NewString(ACTION_QUERY_HSITORY))
-		dict.Set("res_type", jsonutils.NewString(RES_TYPE_BAREMETAL))
+		dict.Set("res_type", jsonutils.NewString(resType))
 		dict.Set("model", jsonutils.NewString(spec))
 		baremetalRate, err := Rates.GetEffectiveRes(session, dict)
 		if err != nil {
-			return nil, errors.Wrap(err, "get baremetal rates err")
+			return nil, errors.Wrap(err, "get rates err")
 		}
 		baremetalPrice, _ := baremetalRate.Float("price")
 		baremetalHourPrice := round(baremetalPrice, 6)

@@ -588,3 +588,24 @@ func (cli *SXskyClient) GetUserKey(name string) (string, string, error) {
 	//}
 	//return user.Id, nil
 }
+
+func (cli *SXskyClient) GetBucketStorageClasses() (map[string]map[string]int64, error) {
+	ctx := context.Background()
+	buckets, err := cli.adminApi.getBuckets(ctx, false)
+	if err != nil {
+		return nil, errors.Wrap(err, "api.getBuckets GetBucketStorageClasses")
+	}
+	bucketClasses := make(map[string]map[string]int64, 0)
+	for _, bucket := range buckets {
+		if len(bucket.Samples) == 0 {
+			log.Warningf("%s bucket samples is 0", bucket.Name)
+			continue
+		}
+		classes := make(map[string]int64, 0)
+		for _, class := range bucket.Samples[0].StorageClasses {
+			classes[class.ClassName] = class.AllocatedSize
+		}
+		bucketClasses[bucket.Name] = classes
+	}
+	return bucketClasses, nil
+}

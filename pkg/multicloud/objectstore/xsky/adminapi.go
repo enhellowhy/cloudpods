@@ -42,6 +42,7 @@ type sManagerDelegate struct {
 	buckets   *hashcache.Cache
 	users     *hashcache.Cache
 	keys      *hashcache.Cache
+	userKeys  *hashcache.Cache
 	s3LbGroup *hashcache.Cache
 }
 
@@ -49,9 +50,10 @@ var managerDelegate *sManagerDelegate
 
 func init() {
 	managerDelegate = &sManagerDelegate{
-		buckets:   hashcache.NewCache(2048, time.Minute*15),
-		users:     hashcache.NewCache(2048, time.Minute*15),
-		keys:      hashcache.NewCache(2048, time.Minute*15),
+		buckets:   hashcache.NewCache(2048, time.Minute*30),
+		users:     hashcache.NewCache(1024, time.Minute*30),
+		keys:      hashcache.NewCache(1024, time.Minute*30),
+		userKeys:  hashcache.NewCache(1024, time.Minute*30),
 		s3LbGroup: hashcache.NewCache(10, time.Hour*24),
 	}
 }
@@ -109,6 +111,18 @@ func (manager *sManagerDelegate) getCacheKey(ak string) (*sKey, error) {
 
 func (manager *sManagerDelegate) setCacheKey(key *sKey) {
 	manager.keys.AtomicSet(key.AccessKey, key)
+}
+
+func (manager *sManagerDelegate) getCacheUserKey(uid int) ([]sKey, error) {
+	val := manager.userKeys.Get(strconv.Itoa(uid))
+	if !gotypes.IsNil(val) {
+		return val.([]sKey), nil
+	}
+	return nil, nil
+}
+
+func (manager *sManagerDelegate) setCacheUserKey(uid int, keys []sKey) {
+	manager.userKeys.AtomicSet(strconv.Itoa(uid), keys)
 }
 
 func (manager *sManagerDelegate) getCacheS3LbGroup() (*sS3LbGroupResponse, error) {
@@ -559,6 +573,10 @@ func (api *SXskyAdminApi) getKeys(ctx context.Context) ([]sKey, error) {
 }
 
 func (api *SXskyAdminApi) getUserKeys(ctx context.Context, id int) ([]sKey, error) {
+	userKeys, _ := managerDelegate.getCacheUserKey(id)
+	if userKeys != nil {
+		return userKeys, nil
+	}
 	keys := make([]sKey, 0)
 	totalCount := 0
 	for totalCount <= 0 || len(keys) < totalCount {
@@ -574,6 +592,7 @@ func (api *SXskyAdminApi) getUserKeys(ctx context.Context, id int) ([]sKey, erro
 		keys = append(keys, output.OsKeys...)
 		totalCount = output.Paging.TotalCount
 	}
+	managerDelegate.setCacheUserKey(id, keys)
 	return keys, nil
 }
 

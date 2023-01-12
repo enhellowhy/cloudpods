@@ -95,6 +95,7 @@ type WorkflowProcessInstanceDetails struct {
 	ProcessDefinitionKey  string    `json:"process_definition_key"`
 	Log                   []*STask  `json:"log"`
 
+	Metadata  map[string]string                       `json:"metadata"`
 	Variables WorkflowProcessInstanceVariablesDetails `json:"variables"`
 }
 

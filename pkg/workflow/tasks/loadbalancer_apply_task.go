@@ -47,6 +47,7 @@ func (self *LoadbalancerApplyTask) taskFailed(ctx context.Context, workflow *mod
 	log.Errorf("fail to apply lb workflow %q", workflow.GetId())
 	workflow.SetStatus(self.UserCred, apis.WORKFLOW_INSTANCE_STATUS_FAILED, reason)
 	workflow.SetState(models.COMPLETED)
+	workflow.SetMetadata(ctx, "sys_error", reason, self.UserCred)
 	logclient.AddActionLogWithContext(ctx, workflow, logclient.ACT_BPM_APPLY_LOADBALANCER, reason, self.UserCred, false)
 	self.SetStageFailed(ctx, jsonutils.NewString(reason))
 }

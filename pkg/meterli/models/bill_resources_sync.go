@@ -88,6 +88,10 @@ func (manager *SBillResourceManager) SyncResources(ctx context.Context, userCred
 	manager.SyncBaremetals(ctx, session)
 	// sync disks
 	manager.SyncDisks(ctx, session)
+	// sync filesystem
+	manager.SyncFileSystems(ctx, session)
+	// sync buckets
+	manager.SyncBuckets(ctx, session)
 }
 
 func (manager *SBillResourceManager) SyncServers(ctx context.Context, session *mcclient.ClientSession) error {
@@ -357,6 +361,146 @@ func (manager *SBillResourceManager) newBillResourceCreateInputByDisk(disk *comp
 	return input
 }
 
+func (manager *SBillResourceManager) SyncFileSystems(ctx context.Context, session *mcclient.ClientSession) error {
+	log.Infoln("start sync file systems")
+	// sync filesystems
+	filesystems, err := ListFileSystems(ctx, session)
+	if err != nil {
+		return errors.Wrapf(err, fmt.Sprintf("ListFileSystems err"))
+	}
+	billResources, err := manager.GetBillResources(RES_TYPE_FILESYSTEM)
+	if err != nil {
+		return errors.Wrap(err, "GetBillResources file system err")
+	}
+	errs := make([]error, 0)
+Loop:
+	for i := range billResources {
+		for index, fs := range filesystems {
+			if fs.Id == billResources[i].ResourceId {
+				if billResources[i].IsStorageChanged(fs.ProjectId, fs.Project, fs.StorageType) {
+					err = billResources[i].DoExpired()
+					if err != nil {
+						errs = append(errs, errors.Wrapf(err, "billResources:%s Update err", billResources[i].ResourceName))
+						continue Loop
+					}
+				} else {
+					if index == len(filesystems)-1 {
+						filesystems = filesystems[0:index]
+					} else {
+						filesystems = append(filesystems[0:index], filesystems[index+1:]...)
+					}
+
+					index--
+				}
+				continue Loop
+			}
+		}
+		err := billResources[i].NoExistState()
+		if err != nil {
+			errs = append(errs, errors.Wrapf(err, "NoExistState update filesystem billResources:%s err", billResources[i].ResourceName))
+		}
+	}
+	for i := range filesystems {
+		input := manager.newBillResourceCreateInputByFileSystem(filesystems[i])
+		err = manager.CreateResource(ctx, input)
+		if err != nil {
+			errs = append(errs, errors.Wrapf(err, "billResources:%s resType:%s DoCreate err", input.ResourceName, RES_TYPE_FILESYSTEM))
+		}
+	}
+	return errors.NewAggregate(errs)
+}
+
+func (manager *SBillResourceManager) newBillResourceCreateInputByFileSystem(fs *computeapi.FileSystemDetails) *api.BillResourceCreateInput {
+	input := new(api.BillResourceCreateInput)
+	input.ResourceType = RES_TYPE_FILESYSTEM
+	input.ResourceId = fs.Id
+	input.ResourceName = fs.Name
+	input.Project = fs.Project
+	input.ProjectId = fs.ProjectId
+	input.ZoneId = fs.ZoneId
+	input.Zone = fs.Zone
+	input.RegionId = fs.RegionId
+	input.Region = fs.Region
+	input.AssociateId = fs.Id
+	input.Cpu = 0
+	input.Mem = 0
+	input.Model = fs.StorageType
+	input.UsageModel = fs.StorageType
+	input.Size = int(fs.Capacity / (1024 * 1024 * 1024))
+
+	return input
+}
+
+func (manager *SBillResourceManager) SyncBuckets(ctx context.Context, session *mcclient.ClientSession) error {
+	log.Infoln("start sync buckets")
+	// sync buckets
+	buckets, err := ListBuckets(ctx, session)
+	if err != nil {
+		return errors.Wrapf(err, fmt.Sprintf("ListBuckets err"))
+	}
+	billResources, err := manager.GetBillResources(RES_TYPE_BUCKET)
+	if err != nil {
+		return errors.Wrap(err, "GetBillResources bucket err")
+	}
+	errs := make([]error, 0)
+Loop:
+	for i := range billResources {
+		for index, bucket := range buckets {
+			if bucket.Id == billResources[i].ResourceId {
+				if billResources[i].IsStorageChanged(bucket.ProjectId, bucket.Project, "default") {
+					err = billResources[i].DoExpired()
+					if err != nil {
+						errs = append(errs, errors.Wrapf(err, "billResources:%s Update err", billResources[i].ResourceName))
+						continue Loop
+					}
+				} else {
+					if index == len(buckets)-1 {
+						buckets = buckets[0:index]
+					} else {
+						buckets = append(buckets[0:index], buckets[index+1:]...)
+					}
+
+					index--
+				}
+				continue Loop
+			}
+		}
+		err := billResources[i].NoExistState()
+		if err != nil {
+			errs = append(errs, errors.Wrapf(err, "NoExistState update bucket billResources:%s err", billResources[i].ResourceName))
+		}
+	}
+	for i := range buckets {
+		input := manager.newBillResourceCreateInputByBucket(buckets[i])
+		err = manager.CreateResource(ctx, input)
+		if err != nil {
+			errs = append(errs, errors.Wrapf(err, "billResources:%s resType:%s DoCreate err", input.ResourceName, RES_TYPE_BUCKET))
+		}
+	}
+	return errors.NewAggregate(errs)
+}
+
+func (manager *SBillResourceManager) newBillResourceCreateInputByBucket(bucket *computeapi.BucketDetails) *api.BillResourceCreateInput {
+	input := new(api.BillResourceCreateInput)
+	input.ResourceType = RES_TYPE_BUCKET
+	input.ResourceId = bucket.Id
+	input.ResourceName = bucket.Name
+	input.Project = bucket.Project
+	input.ProjectId = bucket.ProjectId
+	input.ZoneId = ""
+	input.Zone = ""
+	input.RegionId = bucket.RegionId
+	input.Region = bucket.Region
+	input.AssociateId = bucket.Id
+	input.Cpu = 0
+	input.Mem = 0
+	input.Model = "default"
+	input.UsageModel = "default"
+	input.Size = 0
+
+	return input
+}
+
 func GetOnecloudResources(resTyep string) ([]jsonutils.JSONObject, error) {
 	var err error
 	allResources := make([]jsonutils.JSONObject, 0)
@@ -521,32 +665,52 @@ func ListDisks(ctx context.Context, session *mcclient.ClientSession) ([]*compute
 	return diskList, nil
 }
 
-//func ListHosts(ctx context.Context, session *mcclient.ClientSession) ([]*compute.HostDetails, error) {
-//	hostList := make([]*compute.HostDetails, 0)
-//	params := jsonutils.NewDict()
-//	params.Set("limit", jsonutils.NewInt(0))
-//	params.Set("scope", jsonutils.NewString("system"))
-//	params.Set("baremetal", jsonutils.JSONTrue)
-//	params.Set("host_type", jsonutils.NewString("baremetal"))
-//	params.Set("details", jsonutils.JSONTrue)
-//	res, err := mc_mds.Hosts.List(session, params)
-//	if err != nil {
-//		log.Errorf("get host list err %v", err)
-//		return nil, err
-//	} else {
-//		for i := range res.Data {
-//			//log.Infof(v.String())
-//			hostDetail := new(compute.HostDetails)
-//			err = res.Data[i].Unmarshal(hostDetail)
-//			if err != nil {
-//				log.Errorf("fail to unmarshal hostDetails %v", err)
-//				continue
-//			}
-//			if hostDetail.Guests == 0 || hostDetail.ServerPendingDeleted == true {
-//				continue
-//			}
-//			hostList = append(hostList, hostDetail)
-//		}
-//	}
-//	return hostList, nil
-//}
+func ListFileSystems(ctx context.Context, session *mcclient.ClientSession) ([]*computeapi.FileSystemDetails, error) {
+	fsList := make([]*computeapi.FileSystemDetails, 0)
+	params := jsonutils.NewDict()
+	params.Set("limit", jsonutils.NewInt(0))
+	params.Set("scope", jsonutils.NewString("system"))
+	params.Set("system", jsonutils.JSONTrue)
+	params.Set("pending_delete", jsonutils.NewBool(false))
+	res, err := compute.FileSystems.List(session, params)
+	if err != nil {
+		log.Errorf("get file system list err %v", err)
+		return nil, err
+	} else {
+		for i := range res.Data {
+			fsDetail := new(computeapi.FileSystemDetails)
+			err = res.Data[i].Unmarshal(fsDetail)
+			if err != nil {
+				log.Errorf("fail to unmarshal fsDetails %v", err)
+				continue
+			}
+			fsList = append(fsList, fsDetail)
+		}
+	}
+	return fsList, nil
+}
+
+func ListBuckets(ctx context.Context, session *mcclient.ClientSession) ([]*computeapi.BucketDetails, error) {
+	bucketList := make([]*computeapi.BucketDetails, 0)
+	params := jsonutils.NewDict()
+	params.Set("limit", jsonutils.NewInt(0))
+	params.Set("scope", jsonutils.NewString("system"))
+	params.Set("system", jsonutils.JSONTrue)
+	params.Set("pending_delete", jsonutils.NewBool(false))
+	res, err := compute.Buckets.List(session, params)
+	if err != nil {
+		log.Errorf("get bucket list err %v", err)
+		return nil, err
+	} else {
+		for i := range res.Data {
+			bucketDetail := new(computeapi.BucketDetails)
+			err = res.Data[i].Unmarshal(bucketDetail)
+			if err != nil {
+				log.Errorf("fail to unmarshal bucketDetails %v", err)
+				continue
+			}
+			bucketList = append(bucketList, bucketDetail)
+		}
+	}
+	return bucketList, nil
+}

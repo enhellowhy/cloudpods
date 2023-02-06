@@ -396,7 +396,7 @@ func (o *baseOptions_x86_64) CPU(input CPUOption, osName string) (string, string
 			cpuType += ",+kvm_pv_eoi"
 			if input.IsCPUIntel {
 				cpuType += ",+vmx"
-				cpuType += ",+ssse3,+sse4.1,+sse4.2,-x2apic,+aes,+avx"
+				cpuType += ",+ssse3,+sse4.1,+sse4.2,-x2apic,+aes,+avx,+avx2"
 				cpuType += ",+vme,+pat,+ss,+pclmulqdq,+xsave"
 				cpuType += ",level=13"
 			} else if input.IsCPUAMD {

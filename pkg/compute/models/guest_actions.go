@@ -34,7 +34,6 @@ import (
 	"yunion.io/x/pkg/gotypes"
 	"yunion.io/x/pkg/util/osprofile"
 
-	"gopkg.in/fatih/set.v0"
 	"yunion.io/x/jsonutils"
 	"yunion.io/x/log"
 	"yunion.io/x/pkg/errors"
@@ -489,6 +488,94 @@ func (self *SGuest) GetSchedMigrateParams(
 	}
 	schedDesc.ReuseNetwork = true
 	return schedDesc
+}
+
+func (self *SGuest) PerformMigrateStorage(ctx context.Context, userCred mcclient.TokenCredential, query jsonutils.JSONObject, input *api.GuestMigrateInput) (jsonutils.JSONObject, error) {
+	return nil, self.StartMigrateStorageTask(ctx, userCred, input, self.Status, "")
+}
+
+func (self *SGuest) StartMigrateStorageTask(
+	ctx context.Context, userCred mcclient.TokenCredential,
+	input *api.GuestMigrateInput, guestStatus, parentTaskId string,
+) error {
+	if guestStatus != api.VM_READY {
+		return httperrors.NewNotAcceptableError("Not allow for status %s, please keep status is 'ready'", guestStatus)
+	}
+	if self.GetHypervisor() != api.HYPERVISOR_KVM {
+		//dedicateMigrateTask = "ManagedGuestMigrateTask" //托管私有云
+		return httperrors.NewNotAcceptableError("Not allow for hypervisor %s", self.GetHypervisor())
+	}
+
+	if len(input.TargetStorageId) > 0 {
+		sysDisk, err := self.GetSystemDisk()
+		if err != nil {
+			return httperrors.NewInternalServerError("guest %s get sys disk error %v", self.GetName(), err)
+		}
+		if sysDisk.StorageId == input.TargetStorageId {
+			return httperrors.NewBadRequestError("sys disk %s already exists in target storage %s", sysDisk.GetName(), input.TargetStorageId)
+		}
+		//data.Set("target_storage_id", jsonutils.NewString(targetStorageId))
+	}
+	data := jsonutils.NewDict()
+	data.Set("is_rescue_mode", jsonutils.JSONFalse)
+	//if input.IsRescueMode {
+	//	data.Set("is_rescue_mode", jsonutils.JSONTrue)
+	//}
+	if input.AutoStart {
+		data.Set("auto_start", jsonutils.JSONTrue)
+	}
+	if len(input.PreferHostId) > 0 {
+		data.Set("prefer_host_id", jsonutils.NewString(input.PreferHostId))
+	}
+	if len(input.TargetStorageId) > 0 {
+		data.Set("target_storage_id", jsonutils.NewString(input.TargetStorageId))
+	}
+	srcHost, _ := self.GetHost()
+	srcFileStorages := srcHost.GetAttachedEnabledHostStorages(api.SHARED_FILE_STORAGE)
+	if len(srcFileStorages) == 0 {
+		return httperrors.NewUnsupportOperationError("src host %s no attach nfs storage", srcHost.GetName())
+	}
+	dstHost := HostManager.FetchHostById(input.PreferHostId)
+	dstFileStorages := dstHost.GetAttachedEnabledHostStorages(api.SHARED_FILE_STORAGE)
+	if len(dstFileStorages) == 0 {
+		return httperrors.NewUnsupportOperationError("des host %s no attach nfs storage", dstHost.GetName())
+	}
+	targetStorage := StorageManager.FetchStorageById(input.TargetStorageId)
+	if targetStorage == nil {
+		return httperrors.NewBadRequestError("target storage %s is nil.", input.TargetStorageId)
+	} else {
+		if targetStorage.StorageType == api.STORAGE_LOCAL {
+			if int64(self.GetDisksSize()) > targetStorage.GetFreeCapacity() {
+				return httperrors.NewBadRequestError("guest %s needs %d disk size, target storage %s capacity is %d, no enough capacity.", self.GetName(), self.GetDisksSize(), input.TargetStorageId, targetStorage.GetFreeCapacity())
+			}
+		}
+	}
+	flag := false
+	for _, srcNfs := range srcFileStorages {
+		for _, dstNfs := range dstFileStorages {
+			if srcNfs.GetId() == dstNfs.GetId() {
+				data.Set("nfs_storage_id", jsonutils.NewString(srcNfs.GetId()))
+				flag = true
+				break
+			}
+		}
+		if flag {
+			break
+		}
+	}
+	if !flag {
+		return httperrors.NewUnsupportOperationError("src host %s nfs storage not equal dst host %s", srcHost.GetName(), dstHost.GetName())
+	}
+	data.Set("guest_status", jsonutils.NewString(guestStatus))
+	dedicateMigrateTask := "GuestMigrateStorageTask"
+	if task, err := taskman.TaskManager.NewTask(ctx, dedicateMigrateTask, self, userCred, data, parentTaskId, "", nil); err != nil {
+		log.Errorln(err)
+		return err
+	} else {
+		self.SetStatus(userCred, api.VM_DISK_CHANGE_STORAGE_START_STAGE1, "")
+		task.ScheduleRun(data)
+	}
+	return nil
 }
 
 func (self *SGuest) PerformMigrate(ctx context.Context, userCred mcclient.TokenCredential, query jsonutils.JSONObject, input *api.GuestMigrateInput) (jsonutils.JSONObject, error) {
@@ -5485,7 +5572,7 @@ func (self *SGuest) PerformChangeDiskStorage(ctx context.Context, userCred mccli
 		DiskType: srcDisk.DiskType,
 	}
 
-	targetDisk, err := self.createDiskOnStorage(ctx, userCred, storage, diskConf, nil, true, true)
+	targetDisk, err := self.CreateDiskOnStorage(ctx, userCred, storage, diskConf, nil, true, true)
 	if err != nil {
 		return nil, errors.Wrapf(err, "Create target disk on storage %s", storage.GetName())
 	}
@@ -5503,7 +5590,7 @@ func (self *SGuest) PerformChangeDiskStorage(ctx context.Context, userCred mccli
 func (self *SGuest) StartChangeDiskStorageTask(ctx context.Context, userCred mcclient.TokenCredential, input *api.ServerChangeDiskStorageInternalInput, parentTaskId string) error {
 	reason := fmt.Sprintf("Change disk %s to storage %s", input.DiskId, input.TargetStorageId)
 	self.SetStatus(userCred, api.VM_DISK_CHANGE_STORAGE, reason)
-	return self.GetDriver().StartChangeDiskStorageTask(self, ctx, userCred, input, "")
+	return self.GetDriver().StartChangeDiskStorageTask(self, ctx, userCred, input, parentTaskId)
 }
 
 func (self *SGuest) startSwitchToClonedDisk(ctx context.Context, userCred mcclient.TokenCredential, taskId string) error {

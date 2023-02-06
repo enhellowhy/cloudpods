@@ -493,7 +493,7 @@ func (self *SFileSystem) SyncMountTargetAclsBySource(ctx context.Context, userCr
 		ExtFunc: "GetSource",
 		ExtSet:  extAcls,
 	}
-	err = compare.CompareSetsFunc(set, &removed, &commondb, &commonext, &added)
+	err = compare.CompareSetsFunc(set, &removed, &commondb, &commonext, &added, nil)
 	if err != nil {
 		result.Error(errors.Wrapf(err, "compare.CompareSetsFunc"))
 		return result

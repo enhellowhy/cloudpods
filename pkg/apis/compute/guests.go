@@ -431,6 +431,10 @@ type GuestMigrateInput struct {
 	PreferHostId string `json:"prefer_host_id"`
 	AutoStart    bool   `json:"auto_start"`
 	IsRescueMode bool   `json:"rescue_mode"`
+
+	// 是否是跨存储迁移，默认不是
+	TargetStorageId string `json:"target_storage_id"`
+	StorageEnable   *bool  `json:"storage_enable"`
 }
 
 type GuestLiveMigrateInput struct {
